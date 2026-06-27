@@ -1,0 +1,6 @@
+{
+  "name": "DormyHub",
+  "description": "ระบบจองห้องพักแบบรายวันและรายเดือน พร้อมคำนวณค่าน้ำค่าไฟ และระบบบริหารจัดการหลังบ้านสำหรับแอดมินครบวงจร",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
