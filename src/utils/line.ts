@@ -43,10 +43,33 @@ export async function sendLineNotification(settings: SystemSettings, message: st
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: data.error || 'Failed to send notification' };
+      let errMsg = `Error (${res.status})`;
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        errMsg = `ระบบกำลังรีสตาร์ทเพื่อนำเข้าข้อมูลความปลอดภัยหรือเซิร์ฟเวอร์ยังไม่พร้อมใช้งานชั่วคราว (กรุณารอสักครู่ประมาณ 5-10 วินาทีแล้วลองใหม่อีกครั้ง)`;
+      } else {
+        try {
+          const data = await res.json();
+          errMsg = data.error || errMsg;
+        } catch (e) {
+          try {
+            const txt = await res.text();
+            if (txt && txt.trim()) {
+              errMsg = txt.slice(0, 150);
+            }
+          } catch (e2) {}
+        }
+      }
+      return { success: false, error: errMsg };
     }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      return { success: false, error: 'ได้รับข้อมูลตอบกลับในรูปแบบที่ไม่ถูกต้อง (ไม่ใช่ JSON)' };
+    }
+
     return { success: true };
   } catch (err: any) {
     console.error('Error in sendLineNotification:', err);
@@ -65,10 +88,33 @@ export async function testLineNotification(payload: SendLineNotificationPayload)
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
     if (!res.ok) {
-      return { success: false, error: data.error || 'Failed to send test notification' };
+      let errMsg = `Error (${res.status})`;
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        errMsg = `ระบบกำลังรีสตาร์ทเพื่อนำเข้าข้อมูลความปลอดภัยหรือเซิร์ฟเวอร์ยังไม่พร้อมใช้งานชั่วคราว (กรุณารอสักครู่ประมาณ 5-10 วินาทีแล้วลองใหม่อีกครั้ง)`;
+      } else {
+        try {
+          const data = await res.json();
+          errMsg = data.error || errMsg;
+        } catch (e) {
+          try {
+            const txt = await res.text();
+            if (txt && txt.trim()) {
+              errMsg = txt.slice(0, 150);
+            }
+          } catch (e2) {}
+        }
+      }
+      return { success: false, error: errMsg };
     }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      return { success: false, error: 'ได้รับข้อมูลตอบกลับในรูปแบบที่ไม่ถูกต้อง (ไม่ใช่ JSON)' };
+    }
+
     return { success: true };
   } catch (err: any) {
     console.error('Error in testLineNotification:', err);
