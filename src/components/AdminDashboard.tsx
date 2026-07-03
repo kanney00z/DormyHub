@@ -2100,7 +2100,14 @@ export default function AdminDashboard({
                         ) : (
                           <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
                         )}
-                        <span>{lineTestResult.message}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium leading-relaxed">{lineTestResult.message}</span>
+                          {!lineTestResult.success && (
+                            <span className="text-[10px] text-slate-400 mt-1 block border-t border-rose-500/10 pt-1 leading-normal">
+                              💡 <strong>คำแนะนำ:</strong> หากกรอก Token ครบถ้วนแล้วแต่ขึ้น Error (404) กรุณากดปุ่ม <strong>รีเฟรชหน้าจอ (F5) หรือปิดแล้วเปิดแท็บเบราว์เซอร์ใหม่</strong> เพื่อบังคับให้เบราว์เซอร์ดึงระบบเชื่อมต่อ LINE ตัวล่าสุดของเซิร์ฟเวอร์ครับ
+                            </span>
+                          )}
+                        </div>
                       </motion.div>
                     )}
                   </div>

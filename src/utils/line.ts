@@ -49,23 +49,24 @@ export async function sendLineNotification(settings: SystemSettings, message: st
         errMsg = `ระบบกำลังรีสตาร์ทเพื่อนำเข้าข้อมูลความปลอดภัยหรือเซิร์ฟเวอร์ยังไม่พร้อมใช้งานชั่วคราว (กรุณารอสักครู่ประมาณ 5-10 วินาทีแล้วลองใหม่อีกครั้ง)`;
       } else {
         try {
-          const data = await res.json();
-          errMsg = data.error || errMsg;
-        } catch (e) {
+          const rawText = await res.text();
           try {
-            const txt = await res.text();
-            if (txt && txt.trim()) {
-              errMsg = txt.slice(0, 150);
+            const data = JSON.parse(rawText);
+            errMsg = data.error || errMsg;
+          } catch (jsonErr) {
+            if (rawText && rawText.trim()) {
+              errMsg = rawText.slice(0, 150);
             }
-          } catch (e2) {}
-        }
+          }
+        } catch (e) {}
       }
       return { success: false, error: errMsg };
     }
 
     let data;
     try {
-      data = await res.json();
+      const rawText = await res.text();
+      data = JSON.parse(rawText);
     } catch (e) {
       return { success: false, error: 'ได้รับข้อมูลตอบกลับในรูปแบบที่ไม่ถูกต้อง (ไม่ใช่ JSON)' };
     }
@@ -94,23 +95,24 @@ export async function testLineNotification(payload: SendLineNotificationPayload)
         errMsg = `ระบบกำลังรีสตาร์ทเพื่อนำเข้าข้อมูลความปลอดภัยหรือเซิร์ฟเวอร์ยังไม่พร้อมใช้งานชั่วคราว (กรุณารอสักครู่ประมาณ 5-10 วินาทีแล้วลองใหม่อีกครั้ง)`;
       } else {
         try {
-          const data = await res.json();
-          errMsg = data.error || errMsg;
-        } catch (e) {
+          const rawText = await res.text();
           try {
-            const txt = await res.text();
-            if (txt && txt.trim()) {
-              errMsg = txt.slice(0, 150);
+            const data = JSON.parse(rawText);
+            errMsg = data.error || errMsg;
+          } catch (jsonErr) {
+            if (rawText && rawText.trim()) {
+              errMsg = rawText.slice(0, 150);
             }
-          } catch (e2) {}
-        }
+          }
+        } catch (e) {}
       }
       return { success: false, error: errMsg };
     }
 
     let data;
     try {
-      data = await res.json();
+      const rawText = await res.text();
+      data = JSON.parse(rawText);
     } catch (e) {
       return { success: false, error: 'ได้รับข้อมูลตอบกลับในรูปแบบที่ไม่ถูกต้อง (ไม่ใช่ JSON)' };
     }
