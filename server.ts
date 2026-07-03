@@ -1,12 +1,21 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import fs from "fs";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
+    try {
+      fs.appendFileSync('server.log', logMsg);
+    } catch (e) {}
+    next();
+  });
 
   // API Route for LINE Notifications
   app.post("/api/send-line-notification", async (req: express.Request, res: express.Response) => {
