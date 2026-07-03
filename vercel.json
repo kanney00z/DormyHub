@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/send-line-notification",
+      "destination": "/api/send-line-notification.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
