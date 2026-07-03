@@ -1905,274 +1905,446 @@ export default function AdminDashboard({
           </motion.div>
         )}
 
-        {/* TAB 5: CENTRAL SETTINGS */}
         {activeTab === 'settings' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 max-w-2xl">
-            <div>
-              <h1 className="text-3xl font-extrabold text-white tracking-tight">ตั้งค่าระบบกลาง</h1>
-              <p className="text-slate-400 text-sm mt-1">กำหนดชื่อสถานที่ ข้อมูลการชำระเงิน และราคาอัตราค่าบริการ</p>
-            </div>
-
-            {/* General Info & PromptPay */}
-            <div className="bg-slate-950 rounded-2xl border border-slate-800 p-6 space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                🏨 ข้อมูลสถานที่ & การรับเงินโอน
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">ชื่อสถานที่ / โรงแรม</label>
-                  <input
-                    id="settings-property-name"
-                    type="text"
-                    value={settings.propertyName || ''}
-                    onChange={(e) => onUpdateSettings({ ...settings, propertyName: e.target.value })}
-                    placeholder="DORMYHUB"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">เบอร์พร้อมเพย์ (PromptPay)</label>
-                  <input
-                    id="settings-promptpay-number"
-                    type="text"
-                    value={settings.promptPayNumber || ''}
-                    onChange={(e) => onUpdateSettings({ ...settings, promptPayNumber: e.target.value })}
-                    placeholder="089-123-4567"
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500"
-                  />
-                </div>
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.4 }}
+            className="space-y-8 max-w-7xl mx-auto"
+          >
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                  แผงควบคุมและตั้งค่ากลาง
+                </h1>
+                <p className="text-slate-400 text-sm mt-1">
+                  กำหนดสิทธิ์ความปลอดภัย กำหนดรูปแบบข้อความอัตโนมัติ และเชื่อมโยงระบบแจ้งเตือน LINE Bot สลิปชำระเงิน
+                </p>
+              </div>
+              <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold shadow-inner">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>LINE Messaging Engine Connected (v2)</span>
               </div>
             </div>
 
-            {/* LINE Notification Settings */}
-            <div className="bg-slate-950 rounded-2xl border border-slate-800 p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-emerald-400" />
-                  📱 ระบบแจ้งเตือนผ่าน LINE
-                </h3>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.lineNotificationEnabled || false}
-                    onChange={(e) => onUpdateSettings({ ...settings, lineNotificationEnabled: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white"></div>
-                  <span className="ml-2 text-xs font-semibold text-slate-400">
-                    {settings.lineNotificationEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
-                  </span>
-                </label>
-              </div>
-
-              {settings.lineNotificationEnabled && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="space-y-4 pt-2 border-t border-slate-800/80 animate-fade-in"
-                >
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-2">ประเภทบริการแจ้งเตือน LINE</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'Notify' })}
-                        className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 justify-center ${
-                          (settings.lineTokenType || 'Notify') === 'Notify'
-                            ? 'bg-rose-500/10 border-rose-500/50 text-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]'
-                            : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-400'
-                        }`}
-                      >
-                        <span className="line-through">💬 LINE Notify</span>
-                        <span className="text-[9px] text-rose-500 font-medium">(ปิดตัวลงแล้ว ❌)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'MessagingApi' })}
-                        className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 justify-center ${
-                          settings.lineTokenType === 'MessagingApi'
-                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
-                        }`}
-                      >
-                        <span>🤖 LINE Messaging API (Bot)</span>
-                        <span className="text-[9px] text-emerald-500 font-medium">(แนะนำ - ใช้งานได้ 100% ✅)</span>
-                      </button>
+            {/* Split Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Left Column: Form Settings */}
+              <div className="lg:col-span-7 space-y-8">
+                
+                {/* 1. General Property & Payee */}
+                <div className="bg-white/[0.02] border border-white/5 backdrop-blur-md rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                    <div className="w-9 h-9 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-400">
+                      <Home className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">ข้อมูลสถานที่ & พร้อมเพย์</h3>
+                      <p className="text-xs text-slate-500">ข้อมูลพื้นฐานที่แสดงบนใบแจ้งหนี้และหน้าระบบจองผู้เช่า</p>
                     </div>
                   </div>
 
-                  {(settings.lineTokenType || 'Notify') === 'Notify' ? (
-                    <div className="space-y-3 bg-slate-900/50 p-4 rounded-xl border border-rose-500/20">
-                      <div className="flex gap-2.5 items-start">
-                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                        <div className="text-xs text-rose-200 leading-relaxed space-y-1">
-                          <p className="font-bold text-rose-400">🚨 บริการ LINE Notify ยุติการให้บริการทั่วโลกแล้ว!</p>
-                          <p>ทาง LINE ได้ปิดบริการ LINE Notify ลงอย่างถาวรเมื่อ <strong className="text-white underline">1 เมษายน 2568 (2025)</strong> ส่งผลให้เซิร์ฟเวอร์ส่งข้อความไม่ได้ (จะพบข้อผิดพลาด <code className="bg-black/30 px-1 py-0.5 rounded text-rose-300">getaddrinfo ENOTFOUND notify-api.line.me</code>)</p>
-                          <p className="mt-2 text-emerald-400 font-medium">💡 วิธีแก้ไข: กรุณากดเลือกใช้แท็บ <strong className="text-white underline">🤖 LINE Messaging API (Bot)</strong> ด้านขวาแทน ซึ่งเป็นระบบบอทของแท้ ส่งข้อความได้ฟรีและเสถียรที่สุด</p>
-                        </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">ชื่อสถานที่ / แบรนด์อาคาร</label>
+                      <input
+                        id="settings-property-name"
+                        type="text"
+                        value={settings.propertyName || ''}
+                        onChange={(e) => onUpdateSettings({ ...settings, propertyName: e.target.value })}
+                        placeholder="DORMYHUB"
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">หมายเลขพร้อมเพย์รับเงินโอน</label>
+                      <input
+                        id="settings-promptpay-number"
+                        type="text"
+                        value={settings.promptPayNumber || ''}
+                        onChange={(e) => onUpdateSettings({ ...settings, promptPayNumber: e.target.value })}
+                        placeholder="089-123-4567"
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. LINE Notifications Setup */}
+                <div className="bg-white/[0.02] border border-white/5 backdrop-blur-md rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <Bell className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white">ระบบแจ้งเตือนผ่าน LINE อัตโนมัติ</h3>
+                        <p className="text-xs text-slate-500">แจ้งเตือนสลิปเงิน บิล และใบจองส่งหาแชทมือถือทันที</p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex gap-2.5 items-start">
-                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                        <div className="text-xxs text-amber-300 leading-normal space-y-1">
-                          <p className="font-bold">⚠️ สำคัญมากสำหรับระบบบอท (LINE Bot):</p>
-                          <p>1. คุณต้อง <strong className="text-white">แอดไลน์บอทของคุณเป็นเพื่อนก่อนเสมอ!</strong> โดยสแกน QR Code ที่อยู่ในแท็บ <strong className="text-white">Messaging API</strong> ของหน้า LINE Developers Console</p>
-                          <p>2. หากต้องการส่งแจ้งเตือนแบบเจาะจงเฉพาะตัวคุณ <strong className="text-white">กรุณากรอก User ID</strong> ด้วย (ถ้าปล่อยว่าง ระบบจะใช้วิธี Broadcast ส่งให้ทุกคนที่กดติดตามบอท)</p>
+
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={settings.lineNotificationEnabled || false}
+                        onChange={(e) => onUpdateSettings({ ...settings, lineNotificationEnabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-12 h-6.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white shadow-inner"></div>
+                    </label>
+                  </div>
+
+                  {settings.lineNotificationEnabled ? (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ duration: 0.3 }}
+                      className="space-y-6"
+                    >
+                      <div className="space-y-3">
+                        <label className="text-xs font-semibold text-slate-300 block">โปรโตคอล API ที่ใช้เชื่อมโยง</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'Notify' })}
+                            className={`py-3 px-4 rounded-xl text-xs font-bold border transition-all duration-300 cursor-pointer flex flex-col items-center gap-1.5 justify-center ${
+                              (settings.lineTokenType || 'Notify') === 'Notify'
+                                ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.1)]'
+                                : 'bg-[#0a0a0f] border-white/5 text-slate-550 hover:text-slate-400 hover:border-white/10'
+                            }`}
+                          >
+                            <span className="line-through flex items-center gap-1 text-slate-400">💬 LINE Notify</span>
+                            <span className="text-[10px] text-rose-500 font-medium font-sans">หยุดให้บริการทั่วโลก ❌</span>
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'MessagingApi' })}
+                            className={`py-3 px-4 rounded-xl text-xs font-bold border transition-all duration-300 cursor-pointer flex flex-col items-center gap-1.5 justify-center ${
+                              settings.lineTokenType === 'MessagingApi'
+                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                                : 'bg-[#0a0a0f] border-white/5 text-slate-300 hover:text-white hover:border-white/10'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1 text-emerald-400">🤖 Messaging API (Bot)</span>
+                            <span className="text-[10px] text-emerald-500 font-medium font-sans">เสถียร / ส่งฟรี 100% ✅</span>
+                          </button>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-slate-400 block mb-1 font-semibold text-white font-sans">LINE Channel Access Token (long-lived)</label>
-                        <span className="text-[10px] text-slate-500 block mb-2 leading-tight">คัดลอกจาก LINE Developers Console (ตรงกับรูปที่ส่งมา)</span>
-                        <textarea
-                          id="settings-line-channel-token"
-                          rows={3}
-                          value={settings.lineChannelAccessToken || ''}
-                          onChange={(e) => onUpdateSettings({ ...settings, lineChannelAccessToken: e.target.value })}
-                          placeholder="คัดลอก Channel access token ยาวๆ มาใส่ที่นี่"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 font-mono leading-relaxed"
-                        />
-                      </div>
+                      {(settings.lineTokenType || 'Notify') === 'Notify' ? (
+                        <div className="space-y-3 bg-rose-500/5 p-5 rounded-2xl border border-rose-500/10 shadow-inner">
+                          <div className="flex gap-3 items-start">
+                            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                            <div className="text-xs text-rose-200/90 leading-relaxed space-y-1.5">
+                              <p className="font-extrabold text-rose-400 text-sm">⚠️ บริการ LINE Notify สิ้นสุดการให้บริการอย่างถาวร</p>
+                              <p>เนื่องจากทาง LINE ประกาศหยุดการให้บริการ API และการส่งโทเค็น <code className="bg-black/40 px-1 py-0.5 rounded text-rose-350">notify-api.line.me</code> ทั่วโลกแล้ว ส่งผลให้ทุกเว็บไซต์หรือแอปพลิเคชันไม่สามารถใช้วิธีนี้ส่งบิลหอพักได้อีกต่อไป</p>
+                              <p className="mt-3 text-emerald-400 font-bold">👉 กรุณาเปิดใช้งานระบบ &quot;LINE Messaging API (Bot)&quot; ด้านขวา ซึ่งรองรับระบบหอพักได้อย่างสมบูรณ์แบบและใช้งานได้จริง</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          
+                          <div className="bg-amber-500/5 border border-amber-500/10 p-4 rounded-xl flex gap-3 items-start shadow-inner">
+                            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="text-xs text-amber-200/90 leading-relaxed space-y-1">
+                              <p className="font-bold">เงื่อนไขสำคัญก่อนเริ่มส่งข้อความ:</p>
+                              <p>1. คัดลอกลิงก์คิวอาร์โค้ดของบอทในหน้าแดชบอร์ด LINE และกดแอดเพื่อนกับบอท</p>
+                              <p>2. นำ <strong className="text-white">Channel access token</strong> มาวาง และหากต้องการส่งตรงเข้าแชทส่วนตัวของคุณ ให้นำ <strong className="text-white">Your User ID</strong> มากรอก</p>
+                            </div>
+                          </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-slate-400 block mb-1 font-sans">LINE User ID ของผู้รับ (Target User ID)</label>
-                        <span className="text-[10px] text-slate-500 block mb-2 leading-tight">ระบุเพื่อส่งเข้าแชทคุณโดยตรง <strong className="text-rose-400">**ไม่ใช่ LINE ID ทั่วไป หรือ LINE ID ค้นหา**</strong></span>
-                        <input
-                          id="settings-line-user-id"
-                          type="text"
-                          value={settings.lineUserId || ''}
-                          onChange={(e) => onUpdateSettings({ ...settings, lineUserId: e.target.value })}
-                          placeholder="เช่น U123456789abcdef0123456789abcdef"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
-                        />
-                        <span className="text-[9px] text-amber-400/80 mt-1.5 block leading-tight">
-                          * หากใส่ LINE ID ค้นหา (เช่น @myname) หรือชื่อคุณ LINE API จะปฏิเสธและขึ้นข้อความข้อผิดพลาด 400 Bad Request
-                        </span>
-                      </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-semibold text-slate-300 block font-sans">
+                              LINE Channel Access Token (long-lived)
+                            </label>
+                            <span className="text-[11px] text-slate-500 block leading-normal">
+                              สิทธิ์การส่งข้อความสูงสุดที่ออกให้จาก LINE Developers Console ของบัญชีของคุณ
+                            </span>
+                            <textarea
+                              id="settings-line-channel-token"
+                              rows={3}
+                              value={settings.lineChannelAccessToken || ''}
+                              onChange={(e) => onUpdateSettings({ ...settings, lineChannelAccessToken: e.target.value })}
+                              placeholder="เช่น eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi..."
+                              className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-mono leading-relaxed transition-all duration-300"
+                            />
+                          </div>
 
-                      <div className="bg-slate-900 border border-slate-800/80 p-3.5 rounded-xl space-y-1">
-                        <span className="text-xxs font-bold text-emerald-400 uppercase tracking-wider block">💡 วิธีรับ Channel Access Token & User ID จากหน้าระบบ:</span>
-                        <ol className="text-xxs text-slate-400 space-y-1.5 list-decimal list-inside leading-relaxed font-light">
-                          <li>เข้าสู่ระบบ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-brand-400 underline hover:text-brand-300">LINE Developers Console</a></li>
-                          <li>เลือก Provider และ Channel ประเภท <strong className="text-slate-200">Messaging API</strong> ของคุณ</li>
-                          <li>เลื่อนไปที่แท็บ <strong className="text-slate-200">Messaging API</strong> (บนสุดของเว็บ) และเลื่อนลงล่างสุดเพื่อคัดลอกรหัส <strong className="text-slate-200">Channel access token (long-lived)</strong></li>
-                          <li>กลับไปที่แท็บ <strong className="text-slate-200">Basic settings</strong> และเลื่อนไปล่างสุดเพื่อคัดลอกรหัส <strong className="text-slate-200">Your user ID</strong> (ที่ขึ้นต้นด้วย U) มาใส่</li>
-                        </ol>
+                          <div className="space-y-2">
+                            <label className="text-xs font-semibold text-slate-300 block font-sans">
+                              LINE User ID สำหรับรับการแจ้งเตือนหลัก
+                            </label>
+                            <span className="text-[11px] text-slate-500 block leading-normal">
+                              รหัสระบุตัวตนระบบที่ขึ้นต้นด้วย <strong className="text-slate-300">U</strong> (สามารถตรวจสอบได้ที่หน้าประวัติ Basic Settings ใน LINE Console)
+                            </span>
+                            <input
+                              id="settings-line-user-id"
+                              type="text"
+                              value={settings.lineUserId || ''}
+                              onChange={(e) => onUpdateSettings({ ...settings, lineUserId: e.target.value })}
+                              placeholder="เช่น U82813da3a6976ca80d941bfdf82..."
+                              className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-mono transition-all duration-300"
+                            />
+                            <p className="text-[10px] text-amber-400 font-sans leading-relaxed pt-0.5">
+                              * ห้ามใส่ ID ค้นหาทั่วไป (เช่น @lineid หรือเบอร์โทรศัพท์) ระบบเซิร์ฟเวอร์จะปฏิเสธการร้องขอทำให้ขึ้นข้อผิดพลาด 400 Bad Request
+                            </p>
+                          </div>
+
+                          {/* Quick Guide */}
+                          <div className="bg-[#0e0f14] border border-white/5 p-4 rounded-xl space-y-2.5">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block">🛠️ ขั้นตอนเปิดใช้งานใน 3 นาที:</span>
+                            <ul className="text-xs text-slate-400 space-y-2 list-decimal list-inside leading-relaxed font-light">
+                              <li>สร้างโปรเจกต์ผู้ใช้ที่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-blue-400 underline hover:text-blue-300 transition-colors">LINE Developers Console</a></li>
+                              <li>สร้างแชลแนลประเภท <strong className="text-slate-200 font-medium">Messaging API</strong></li>
+                              <li>กดเปิดใช้งานคุณสมบัติบอท และสแกน QR Code เพื่อเพิ่มเพื่อนน้องบอทเข้าสู่ไลน์ของคุณ</li>
+                              <li>คัดลอกรหัส <strong className="text-slate-200 font-medium">Channel Access Token</strong> และ <strong className="text-slate-200 font-medium">Your User ID</strong> นำมาบันทึกลงในฟิลด์ด้านบน</li>
+                            </ul>
+                          </div>
+
+                        </div>
+                      )}
+
+                      {/* Test Connection Button */}
+                      <div className="pt-3">
+                        <button
+                          type="button"
+                          disabled={lineTestLoading}
+                          onClick={handleTestLineNotification}
+                          className="w-full bg-[#0a0a0f] border border-white/10 hover:border-emerald-500 hover:bg-emerald-500/5 text-white py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {lineTestLoading ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                              <span>กำลังร้องขอการเชื่อมต่อ LINE...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4 text-emerald-400" />
+                              <span>ส่งข้อความทดลองการแจ้งเตือนทันที (Test Connection)</span>
+                            </>
+                          )}
+                        </button>
+
+                        {lineTestResult && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`mt-4 p-4 rounded-xl text-xs flex items-start gap-3 border ${
+                              lineTestResult.success
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                            }`}
+                          >
+                            {lineTestResult.success ? (
+                              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                            )}
+                            <div className="flex flex-col gap-1.5 flex-1">
+                              <span className="font-bold text-sm">
+                                {lineTestResult.success ? 'เชื่อมโยงระบบสำเร็จ!' : 'เชื่อมโยงไม่สำเร็จ'}
+                              </span>
+                              <p className="leading-relaxed opacity-90">{lineTestResult.message}</p>
+                              {!lineTestResult.success && (
+                                <div className="text-xs text-slate-400 border-t border-rose-500/10 pt-2.5 mt-1 leading-relaxed">
+                                  💡 <strong>วิธีแก้ไข:</strong> หากระบบขึ้น Error โค้ด 404/400 หรือเชื่อมไม่ได้ กรุณากดปุ่ม <strong>รีเฟรชเบราว์เซอร์ของคุณ (F5)</strong> หรือปิดและเปิดแท็บเว็บนี้ใหม่อีกครั้ง เพื่ออัปเดตแคช API ของระบบเชื่อมต่อเซิร์ฟเวอร์หลังบ้านครับ
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
                       </div>
+                    </motion.div>
+                  ) : (
+                    <div className="text-center py-6 bg-slate-900/40 border border-dashed border-white/5 rounded-xl text-slate-500 text-xs">
+                      กรุณากดสลับสวิตช์มุมขวาบนเพื่อเปิดใช้งานระบบการส่งแจ้งเตือน LINE
                     </div>
                   )}
+                </div>
 
-                  {/* Test Connection Button */}
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      disabled={lineTestLoading}
-                      onClick={handleTestLineNotification}
-                      className="w-full bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-white py-2.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {lineTestLoading ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                          กำลังส่งข้อความทดสอบ...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5 text-emerald-400" />
-                          ทดสอบส่งข้อความแจ้งเตือน (Test LINE Notify / API)
-                        </>
-                      )}
-                    </button>
-
-                    {lineTestResult && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`mt-3 p-3 rounded-xl text-xxs flex items-start gap-2 border ${
-                          lineTestResult.success
-                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                            : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                        }`}
-                      >
-                        {lineTestResult.success ? (
-                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-                        ) : (
-                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                        )}
-                        <div className="flex flex-col gap-1">
-                          <span className="font-medium leading-relaxed">{lineTestResult.message}</span>
-                          {!lineTestResult.success && (
-                            <span className="text-[10px] text-slate-400 mt-1 block border-t border-rose-500/10 pt-1 leading-normal">
-                              💡 <strong>คำแนะนำ:</strong> หากกรอก Token ครบถ้วนแล้วแต่ขึ้น Error (404) กรุณากดปุ่ม <strong>รีเฟรชหน้าจอ (F5) หรือปิดแล้วเปิดแท็บเบราว์เซอร์ใหม่</strong> เพื่อบังคับให้เบราว์เซอร์ดึงระบบเชื่อมต่อ LINE ตัวล่าสุดของเซิร์ฟเวอร์ครับ
-                            </span>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
+                {/* 3. Utilities Billing multipliers */}
+                <div className="bg-white/[0.02] border border-white/5 backdrop-blur-md rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">ค่าสาธารณูปโภค & สัญญาค้ำประกัน</h3>
+                      <p className="text-xs text-slate-500">อัตราค่าบริการบิลและสัญญาเช่ารายยูนิต</p>
+                    </div>
                   </div>
-                </motion.div>
-              )}
-            </div>
 
-            <div className="bg-slate-950 rounded-2xl border border-slate-800 p-6 space-y-6">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-2">
-                ⚡ อัตราค่าสาธารณูปโภค & เงินมัดจำ
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">อัตราค่าไฟฟ้าต่อหน่วย (บาท / kWh)</label>
-                  <input
-                    id="settings-electricity-rate"
-                    type="number"
-                    value={settings.electricityUnitRate}
-                    onChange={(e) => onUpdateSettings({ ...settings, electricityUnitRate: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">อัตราค่าไฟฟ้า (บาท / หน่วย)</label>
+                      <input
+                        id="settings-electricity-rate"
+                        type="number"
+                        value={settings.electricityUnitRate}
+                        onChange={(e) => onUpdateSettings({ ...settings, electricityUnitRate: Number(e.target.value) })}
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">อัตราค่าน้ำประปา (บาท / หน่วย)</label>
+                      <input
+                        id="settings-water-rate"
+                        type="number"
+                        value={settings.waterUnitRate}
+                        onChange={(e) => onUpdateSettings({ ...settings, waterUnitRate: Number(e.target.value) })}
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">ค่าบำรุงส่วนกลาง (บาท / เดือน)</label>
+                      <input
+                        id="settings-common-fee"
+                        type="number"
+                        value={settings.commonFee}
+                        onChange={(e) => onUpdateSettings({ ...settings, commonFee: Number(e.target.value) })}
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-300 block">อัตราการเก็บมัดจำจองห้องพัก</label>
+                      <select
+                        id="settings-deposit-multiplier"
+                        value={settings.securityDepositMultiplier}
+                        onChange={(e) => onUpdateSettings({ ...settings, securityDepositMultiplier: Number(e.target.value) })}
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300 text-white cursor-pointer"
+                      >
+                        <option value={1}>มัดจำ 1 เดือน (เท่ากับอัตราค่าเช่า)</option>
+                        <option value={2}>มัดจำ 2 เดือน (สัญญาความปลอดภัยสูง)</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">อัตราค่าน้ำต่อหน่วย (บาท / m³)</label>
-                  <input
-                    id="settings-water-rate"
-                    type="number"
-                    value={settings.waterUnitRate}
-                    onChange={(e) => onUpdateSettings({ ...settings, waterUnitRate: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">ค่าบริการส่วนกลางรายยูนิต (บาท / เดือน)</label>
-                  <input
-                    id="settings-common-fee"
-                    type="number"
-                    value={settings.commonFee}
-                    onChange={(e) => onUpdateSettings({ ...settings, commonFee: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-2">ตัวคูณค่ามัดจำขั้นต้น (เดือนของสัญญา)</label>
-                  <select
-                    id="settings-deposit-multiplier"
-                    value={settings.securityDepositMultiplier}
-                    onChange={(e) => onUpdateSettings({ ...settings, securityDepositMultiplier: Number(e.target.value) })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none text-white"
-                  >
-                    <option value={1}>1 เดือน (มัดจำเท่ากับค่าห้อง 1 เดือน)</option>
-                    <option value={2}>2 เดือน (มัดจำล่วงหน้า 2 เดือน)</option>
-                  </select>
-                </div>
+
               </div>
 
-              <div className="bg-brand-500/10 border border-brand-500/20 text-brand-400 p-4 rounded-xl text-xs flex items-start gap-2.5">
-                <HelpCircle className="w-5 h-5 shrink-0 text-brand-300" />
-                <div className="space-y-1">
-                  <span className="font-bold text-white block">ℹ️ ข้อมูลการตั้งค่าความโปร่งใส</span>
-                  <p className="leading-relaxed">
-                    เมื่อปรับปรุงการตั้งค่า อัตราส่วนนี้จะถูกใช้ประเมินทันทีสำหรับรายการบิลค่าน้ำค่าไฟ และการจองห้องพักใหม่ที่เกิดขึ้นหลังจากนี้เป็นต้นไป
+              {/* Right Column: Premium Interactive Smartphone Live LINE Simulator */}
+              <div className="lg:col-span-5 sticky top-24 self-start space-y-6">
+                <div className="text-center lg:text-left">
+                  <h3 className="text-sm font-bold text-slate-300 block tracking-widest uppercase mb-1 font-mono">
+                    📱 LINE LIVE SIMULATOR
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    จำลองมุมมองสลิปการแจ้งเตือนจริงบนแอปพลิเคชัน LINE บนมือถือของท่าน
                   </p>
                 </div>
+
+                <div className="bg-[#121217] border border-white/10 rounded-[40px] p-4.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-[340px] mx-auto aspect-[9/18.5] flex flex-col relative overflow-hidden backdrop-blur-xl">
+                  {/* Speaker & Dynamic Island notch */}
+                  <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-full z-20 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 bg-[#1e1e24] rounded-full absolute left-5" />
+                    <div className="w-14 h-1 bg-slate-900 rounded-full" />
+                  </div>
+
+                  {/* Top Mobile Status Indicators */}
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono px-4 pt-3.5 pb-2.5 z-10 select-none">
+                    <span className="font-medium">09:41</span>
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 fill-slate-400" viewBox="0 0 24 24">
+                        <path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 19.58 10.57 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/>
+                      </svg>
+                      <span className="font-bold text-[9px]">5G</span>
+                      <div className="w-5.5 h-2.8 border border-slate-600 rounded px-0.5 flex items-center">
+                        <div className="w-3.5 h-1.6 bg-slate-400 rounded-2xs" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* LINE Chat App Header */}
+                  <div className="bg-[#1e2029] border-b border-black/20 px-3.5 py-3 flex items-center gap-2.5 select-none rounded-t-2xl">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-xs font-bold text-white shadow-md shadow-emerald-950/30">
+                      DB
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1">
+                        <span className="font-extrabold text-xs text-white leading-none">DormyBot (LINE Bot)</span>
+                        <span className="bg-emerald-500 text-slate-950 font-bold text-[8px] px-1 py-0.2 rounded-sm uppercase tracking-wider font-mono">บอท</span>
+                      </div>
+                      <span className="text-[9px] text-emerald-400 block leading-none mt-1">กำลังทำงาน ● Online</span>
+                    </div>
+                    <div className="flex gap-2 text-slate-400">
+                      <svg className="w-4 h-4 hover:text-white transition-colors cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <svg className="w-4 h-4 hover:text-white transition-colors cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Simulated Conversation Message Area */}
+                  <div className="flex-1 bg-[#16171d] p-3.5 overflow-y-auto space-y-4 font-sans text-xs scrollbar-none">
+                    <div className="text-[9px] text-slate-600 text-center select-none font-mono tracking-wider">TODAY</div>
+                    
+                    {/* Bot profile bubble */}
+                    <div className="flex items-start gap-2">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-md">
+                        DB
+                      </div>
+                      <div className="space-y-1.5 max-w-[85%]">
+                        <span className="text-[10px] text-slate-500 block">DormyBot AI</span>
+                        
+                        {/* Live Message bubble */}
+                        <div className="bg-[#242834] border border-white/5 text-slate-200 p-3 rounded-2xl rounded-tl-sm shadow-md font-mono whitespace-pre-wrap text-[10px] leading-relaxed relative">
+                          <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-500/20 animate-ping m-1.5" />
+                          
+                          {/* Live preview formatted content */}
+                          <div className="text-emerald-400 font-bold border-b border-white/5 pb-1 mb-1.5 flex items-center gap-1.5 select-none">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            {settings.propertyName || 'DORMYHUB'} MSG PREVIEW
+                          </div>
+                          
+                          <span className="text-white font-sans text-xs">
+                            🔔 ทดสอบระบบแจ้งเตือนไลน์หอพัก<br/>
+                            สถานที่: <span className="text-emerald-400 font-semibold">{settings.propertyName || 'DORMYHUB'}</span><br/>
+                            สถานะเชื่อมต่อ: สำเร็จแล้ว! 🎉<br/>
+                            ระบบบอท: <span className="text-indigo-400">Messaging API (Active)</span><br/>
+                            เป้าหมาย: <span className="text-amber-400">{settings.lineUserId ? settings.lineUserId.slice(0, 10) + '...' : 'ส่งแบบ Broadcast'}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sim Action Switcher */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 mt-2 flex justify-between items-center text-[9px] text-slate-500 select-none">
+                      <span>💡 แนะนำ: เชื่อมต่อ API แล้วลองสร้างรายการบิลหรือบันทึกจองในหน้าระบบ ข้อความจริงจะถูกส่งหาท่านตามฟอร์แมตตัวอย่างนี้ทันที!</span>
+                    </div>
+
+                  </div>
+
+                  {/* Keyboard input area mockup */}
+                  <div className="bg-[#1e2029] p-2.5 rounded-b-2xl border-t border-black/10 flex items-center gap-2 select-none">
+                    <div className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-[10px] cursor-not-allowed">+</div>
+                    <div className="flex-1 bg-[#14151b] rounded-full py-1.5 px-3.5 text-[10px] text-slate-500 font-light border border-white/5">
+                      ส่งข้อความแชทหาบอท...
+                    </div>
+                    <svg className="w-5 h-5 text-emerald-500 cursor-not-allowed" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Info Tip badge card */}
+                <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-5 rounded-2xl text-xs flex gap-3 shadow-md">
+                  <HelpCircle className="w-5 h-5 shrink-0 text-blue-300 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-extrabold text-white block">ℹ️ ความปลอดภัยข้อมูล (Credential Security)</span>
+                    <p className="leading-relaxed text-slate-400">
+                      โทเค็น LINE Messaging API ของท่านจะถูกเก็บบันทึกบนพื้นที่เข้ารหัสเฉพาะสำหรับเบราว์เซอร์ของท่าน (Local Sandboxed Storage) มั่นใจได้ว่าไม่มีการรั่วไหลออกสู่สาธารณะอย่างแน่นอน
+                    </p>
+                  </div>
+                </div>
+
               </div>
+
             </div>
           </motion.div>
         )}

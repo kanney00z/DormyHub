@@ -97,43 +97,56 @@ export default function App() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#0a0a0c] flex flex-col font-sans select-none text-slate-200">
+    <div className="w-full min-h-screen bg-[#060608] flex flex-col font-sans select-none text-slate-100 relative overflow-hidden">
       
+      {/* Premium Ambient Background Decorations */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-blue-600/10 blur-[180px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-sky-500/10 blur-[150px] rounded-full pointer-events-none" />
+      <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[800px] h-[200px] bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
+      
+      {/* High-end Subtle Grid overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_10%,#000_70%,transparent_100%)] pointer-events-none" />
+
       {/* Universal Mode switcher navigation bar wrapped in a sticky container to maintain correct document flow spacing */}
-      <div className="sticky top-0 z-40 w-full backdrop-blur-md">
-        <header className="bg-[#121216]/95 border-b border-white/10 text-white py-4 px-4 md:px-8 flex flex-col xl:flex-row items-center justify-between gap-4 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
+      <div className="sticky top-0 z-40 w-full backdrop-blur-xl border-b border-white/5 bg-[#0a0a0f]/60">
+        <header className="max-w-7xl mx-auto py-3 px-4 md:px-8 flex flex-col xl:flex-row items-center justify-between gap-4">
           
           {/* Left Side: Brand Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.4)]">
-              <Building className="w-5.5 h-5.5 text-white stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:scale-105 transition-all duration-300">
+              <Building className="w-5.5 h-5.5 text-white stroke-[2.2]" />
             </div>
             <div>
-              <span className="font-extrabold text-xl tracking-tighter bg-gradient-to-r from-brand-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent inline-block">
-                {settings.propertyName || 'DORMYHUB'}
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-slate-500 block leading-none mt-1">Property Management</span>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent inline-block">
+                  {settings.propertyName || 'DORMYHUB'}
+                </span>
+                <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[9px] px-1.5 py-0.5 rounded-md font-bold tracking-wider uppercase animate-pulse">
+                  v4.12
+                </span>
+              </div>
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 block leading-none mt-1 font-mono">Premium Residences</span>
             </div>
           </div>
 
           {/* Center: Live Simulator Hint - visible on xl screens to ensure perfect spacing */}
-          <div className="hidden xl:flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-xs backdrop-blur-sm">
-            <Info className="w-4 h-4 text-brand-400 shrink-0" />
-            <span className="text-slate-300 font-light">
-              💡 แนะนำ: ลองจองห้องในหน้าผู้เช่าพัก แล้วเปิด <strong className="text-brand-400 font-semibold">ระบบหลังบ้านแอดมิน</strong> เพื่อเช็คอินหรือบันทึกค่าน้ำค่าไฟได้ทันที!
+          <div className="hidden xl:flex items-center gap-2 bg-white/5 border border-white/5 px-4 py-2 rounded-xl text-xs backdrop-blur-sm shadow-inner">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span className="text-slate-400 font-light">
+              แนะนำ: บันทึกจองห้องพักในระบบ และตั้งค่าความเชื่อมโยงกับ <strong className="text-white font-medium">LINE Messaging API (Bot)</strong> ในแท็บตั้งค่าเพื่อทดสอบแจ้งเตือนแบบเรียลไทม์!
             </span>
           </div>
 
           {/* Right Side: Role Selector and Reset button */}
           <div className="flex items-center gap-3 w-full xl:w-auto justify-center xl:justify-end">
-            <div className="flex bg-[#0a0a0c] p-1 rounded-xl border border-white/10">
+            <div className="flex bg-[#060608]/80 p-1 rounded-xl border border-white/5 shadow-inner">
               <button
                 id="switch-to-guest"
                 onClick={() => setRole('guest')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-350 ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-300 cursor-pointer ${
                   role === 'guest'
-                    ? 'bg-brand-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)] border border-brand-500/30 font-semibold'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.3)] border border-blue-500/20 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <User className="w-3.5 h-3.5" />
@@ -142,21 +155,21 @@ export default function App() {
               <button
                 id="switch-to-admin"
                 onClick={() => setRole('admin')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-350 ${
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all duration-300 cursor-pointer ${
                   role === 'admin'
-                    ? 'bg-brand-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.4)] border border-brand-500/30 font-semibold'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.3)] border border-blue-500/20 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Shield className="w-3.5 h-3.5" />
-                หลังบ้านแอดมิน (Admin)
+                ผู้ดูแลระบบ (Admin)
               </button>
             </div>
 
             <button
               id="btn-reset-db"
               onClick={handleResetDatabase}
-              className="text-xs bg-white/5 text-slate-400 border border-white/10 px-3.5 py-2 rounded-xl hover:bg-white/10 hover:text-white transition-all font-light whitespace-nowrap"
+              className="text-xs bg-white/5 text-slate-400 border border-white/5 px-3.5 py-2 rounded-xl hover:bg-white/10 hover:text-white transition-all duration-300 font-light whitespace-nowrap cursor-pointer hover:border-white/10"
               title="รีเซ็ตค่าเริ่มต้นทั้งหมด"
             >
               รีเซ็ตระบบ
@@ -166,7 +179,7 @@ export default function App() {
       </div>
 
       {/* Main Container Views with smooth Fade-in animation */}
-      <div className="flex-1">
+      <div className="flex-1 relative z-10">
         <AnimatePresence mode="wait">
           {role === 'guest' ? (
             <motion.div
