@@ -10,10 +10,14 @@ async function startServer() {
   app.use(express.json());
 
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
-    try {
-      fs.appendFileSync('server.log', logMsg);
-    } catch (e) {}
+    const startTime = Date.now();
+    res.on("finish", () => {
+      const duration = Date.now() - startTime;
+      const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url} - Status: ${res.statusCode} (${duration}ms)\n`;
+      try {
+        fs.appendFileSync('server.log', logMsg);
+      } catch (e) {}
+    });
     next();
   });
 
