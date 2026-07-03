@@ -13,7 +13,7 @@ export async function sendLineNotification(settings: SystemSettings, message: st
     return { success: false, error: 'LINE notification is disabled in settings' };
   }
 
-  const tokenType = settings.lineTokenType || 'Notify';
+  const tokenType = settings.lineTokenType || 'MessagingApi';
   const payload: SendLineNotificationPayload = {
     tokenType,
     message,

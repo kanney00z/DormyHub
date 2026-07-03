@@ -30,7 +30,20 @@ export default function App() {
 
   const [settings, setSettings] = useState<SystemSettings>(() => {
     const saved = localStorage.getItem('dormy_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Automatically switch to MessagingApi if they are still on Notify but have a channel access token,
+        // or if they had Notify selected but Notify is deprecated.
+        if (parsed.lineTokenType === 'Notify' && (!parsed.lineNotifyToken || parsed.lineChannelAccessToken)) {
+          parsed.lineTokenType = 'MessagingApi';
+        }
+        return parsed;
+      } catch (e) {
+        return DEFAULT_SETTINGS;
+      }
+    }
+    return DEFAULT_SETTINGS;
   });
 
   // Save states automatically on changes

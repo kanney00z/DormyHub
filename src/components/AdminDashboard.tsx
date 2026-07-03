@@ -412,7 +412,7 @@ export default function AdminDashboard({
   const handleTestLineNotification = async () => {
     setLineTestLoading(true);
     setLineTestResult(null);
-    const tokenType = settings.lineTokenType || 'Notify';
+    const tokenType = settings.lineTokenType || 'MessagingApi';
     
     let isConfigured = false;
     if (tokenType === 'Notify' && settings.lineNotifyToken) {
@@ -1977,55 +1977,54 @@ export default function AdminDashboard({
                       <button
                         type="button"
                         onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'Notify' })}
-                        className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 justify-center ${
                           (settings.lineTokenType || 'Notify') === 'Notify'
-                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
+                            ? 'bg-rose-500/10 border-rose-500/50 text-rose-400 shadow-[0_0_10px_rgba(239,68,68,0.15)]'
+                            : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-400'
                         }`}
                       >
-                        💬 LINE Notify
+                        <span className="line-through">💬 LINE Notify</span>
+                        <span className="text-[9px] text-rose-500 font-medium">(ปิดตัวลงแล้ว ❌)</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => onUpdateSettings({ ...settings, lineTokenType: 'MessagingApi' })}
-                        className={`py-2.5 px-4 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 justify-center ${
                           settings.lineTokenType === 'MessagingApi'
                             ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold shadow-[0_0_10px_rgba(16,185,129,0.15)]'
                             : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-300'
                         }`}
                       >
-                        🤖 LINE Messaging API (Bot)
+                        <span>🤖 LINE Messaging API (Bot)</span>
+                        <span className="text-[9px] text-emerald-500 font-medium">(แนะนำ - ใช้งานได้ 100% ✅)</span>
                       </button>
                     </div>
                   </div>
 
                   {(settings.lineTokenType || 'Notify') === 'Notify' ? (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-semibold text-slate-400 block mb-2">LINE Notify Token</label>
-                        <input
-                          id="settings-line-notify-token"
-                          type="password"
-                          value={settings.lineNotifyToken || ''}
-                          onChange={(e) => onUpdateSettings({ ...settings, lineNotifyToken: e.target.value })}
-                          placeholder="กรอก LINE Notify Token ของคุณ"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500 font-mono"
-                        />
-                      </div>
-                      <div className="bg-slate-900 border border-slate-800/80 p-3.5 rounded-xl space-y-1">
-                        <span className="text-xxs font-bold text-emerald-400 uppercase tracking-wider block">💡 วิธีรับ LINE Notify Token:</span>
-                        <ol className="text-xxs text-slate-400 space-y-1 list-decimal list-inside leading-relaxed font-light">
-                          <li>เข้าสู่เว็บไซต์ <a href="https://notify-bot.line.me" target="_blank" rel="noreferrer" className="text-brand-400 underline hover:text-brand-300">LINE Notify</a> แล้วล็อกอินด้วยบัญชี LINE</li>
-                          <li>ไปที่ <strong className="text-slate-200">My Page (หน้าของฉัน)</strong> แล้วคลิก <strong className="text-slate-200">Generate Token (ออก Token)</strong></li>
-                          <li>เลือกแชทส่วนตัว หรือกลุ่มที่ต้องการให้แจ้งเตือน แล้วคัดลอก Token มาใส่ในช่องด้านบน</li>
-                          <li><strong className="text-emerald-400">สำคัญ:</strong> หากเป็นแชทกลุ่ม ต้องเชิญบัญชีชื่อ "LINE Notify" เข้ากลุ่มด้วย</li>
-                        </ol>
+                    <div className="space-y-3 bg-slate-900/50 p-4 rounded-xl border border-rose-500/20">
+                      <div className="flex gap-2.5 items-start">
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div className="text-xs text-rose-200 leading-relaxed space-y-1">
+                          <p className="font-bold text-rose-400">🚨 บริการ LINE Notify ยุติการให้บริการทั่วโลกแล้ว!</p>
+                          <p>ทาง LINE ได้ปิดบริการ LINE Notify ลงอย่างถาวรเมื่อ <strong className="text-white underline">1 เมษายน 2568 (2025)</strong> ส่งผลให้เซิร์ฟเวอร์ส่งข้อความไม่ได้ (จะพบข้อผิดพลาด <code className="bg-black/30 px-1 py-0.5 rounded text-rose-300">getaddrinfo ENOTFOUND notify-api.line.me</code>)</p>
+                          <p className="mt-2 text-emerald-400 font-medium">💡 วิธีแก้ไข: กรุณากดเลือกใช้แท็บ <strong className="text-white underline">🤖 LINE Messaging API (Bot)</strong> ด้านขวาแทน ซึ่งเป็นระบบบอทของแท้ ส่งข้อความได้ฟรีและเสถียรที่สุด</p>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
+                      <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl flex gap-2.5 items-start">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-xxs text-amber-300 leading-normal space-y-1">
+                          <p className="font-bold">⚠️ สำคัญมากสำหรับระบบบอท (LINE Bot):</p>
+                          <p>1. คุณต้อง <strong className="text-white">แอดไลน์บอทของคุณเป็นเพื่อนก่อนเสมอ!</strong> โดยสแกน QR Code ที่อยู่ในแท็บ <strong className="text-white">Messaging API</strong> ของหน้า LINE Developers Console</p>
+                          <p>2. หากต้องการส่งแจ้งเตือนแบบเจาะจงเฉพาะตัวคุณ <strong className="text-white">กรุณากรอก User ID</strong> ด้วย (ถ้าปล่อยว่าง ระบบจะใช้วิธี Broadcast ส่งให้ทุกคนที่กดติดตามบอท)</p>
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="text-xs font-semibold text-slate-400 block mb-1 font-semibold text-white">LINE Channel Access Token (long-lived)</label>
+                        <label className="text-xs font-semibold text-slate-400 block mb-1 font-semibold text-white font-sans">LINE Channel Access Token (long-lived)</label>
                         <span className="text-[10px] text-slate-500 block mb-2 leading-tight">คัดลอกจาก LINE Developers Console (ตรงกับรูปที่ส่งมา)</span>
                         <textarea
                           id="settings-line-channel-token"
@@ -2038,25 +2037,28 @@ export default function AdminDashboard({
                       </div>
 
                       <div>
-                        <label className="text-xs font-semibold text-slate-400 block mb-1">LINE User ID ของผู้รับ (Target User ID) - ไม่บังคับ</label>
-                        <span className="text-[10px] text-slate-500 block mb-2 leading-tight">ระบุเพื่อส่งแบบ Push Message ส่วนตัว (หากไม่ใส่ ระบบจะใช้วิธี Broadcast ส่งให้เพื่อนทุกคนที่ติดตามบอท)</span>
+                        <label className="text-xs font-semibold text-slate-400 block mb-1 font-sans">LINE User ID ของผู้รับ (Target User ID)</label>
+                        <span className="text-[10px] text-slate-500 block mb-2 leading-tight">ระบุเพื่อส่งเข้าแชทคุณโดยตรง <strong className="text-rose-400">**ไม่ใช่ LINE ID ทั่วไป หรือ LINE ID ค้นหา**</strong></span>
                         <input
                           id="settings-line-user-id"
                           type="text"
                           value={settings.lineUserId || ''}
                           onChange={(e) => onUpdateSettings({ ...settings, lineUserId: e.target.value })}
                           placeholder="เช่น U123456789abcdef0123456789abcdef"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand-500 font-mono"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-brand-500 font-mono"
                         />
+                        <span className="text-[9px] text-amber-400/80 mt-1.5 block leading-tight">
+                          * หากใส่ LINE ID ค้นหา (เช่น @myname) หรือชื่อคุณ LINE API จะปฏิเสธและขึ้นข้อความข้อผิดพลาด 400 Bad Request
+                        </span>
                       </div>
 
                       <div className="bg-slate-900 border border-slate-800/80 p-3.5 rounded-xl space-y-1">
-                        <span className="text-xxs font-bold text-emerald-400 uppercase tracking-wider block">💡 วิธีรับ Channel Access Token & User ID:</span>
-                        <ol className="text-xxs text-slate-400 space-y-1 list-decimal list-inside leading-relaxed font-light">
+                        <span className="text-xxs font-bold text-emerald-400 uppercase tracking-wider block">💡 วิธีรับ Channel Access Token & User ID จากหน้าระบบ:</span>
+                        <ol className="text-xxs text-slate-400 space-y-1.5 list-decimal list-inside leading-relaxed font-light">
                           <li>เข้าสู่ระบบ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-brand-400 underline hover:text-brand-300">LINE Developers Console</a></li>
-                          <li>เลือก Provider และ Channel ประเภท Messaging API ของคุณ</li>
-                          <li>เลื่อนไปที่แท็บ <strong className="text-slate-200">Messaging API</strong> เพื่อออกรหัส <strong className="text-slate-200">Channel access token (long-lived)</strong></li>
-                          <li>ค้นหา <strong className="text-slate-200">Your user ID</strong> ของคุณที่แท็บแรกสุด (Basic settings) ด้านล่างสุด เพื่อรับรหัสผู้รับ</li>
+                          <li>เลือก Provider และ Channel ประเภท <strong className="text-slate-200">Messaging API</strong> ของคุณ</li>
+                          <li>เลื่อนไปที่แท็บ <strong className="text-slate-200">Messaging API</strong> (บนสุดของเว็บ) และเลื่อนลงล่างสุดเพื่อคัดลอกรหัส <strong className="text-slate-200">Channel access token (long-lived)</strong></li>
+                          <li>กลับไปที่แท็บ <strong className="text-slate-200">Basic settings</strong> และเลื่อนไปล่างสุดเพื่อคัดลอกรหัส <strong className="text-slate-200">Your user ID</strong> (ที่ขึ้นต้นด้วย U) มาใส่</li>
                         </ol>
                       </div>
                     </div>

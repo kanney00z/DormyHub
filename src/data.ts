@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   propertyName: 'DORMYHUB',
   promptPayNumber: '089-123-4567',
   lineNotificationEnabled: false,
-  lineTokenType: 'Notify',
+  lineTokenType: 'MessagingApi',
   lineNotifyToken: '',
   lineChannelAccessToken: '',
   lineUserId: '',
