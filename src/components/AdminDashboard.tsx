@@ -77,6 +77,7 @@ export default function AdminDashboard({
   // LINE Notification Testing state
   const [lineTestLoading, setLineTestLoading] = useState(false);
   const [lineTestResult, setLineTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [simActiveTab, setSimActiveTab] = useState<'booking' | 'invoice' | 'payment' | 'status'>('booking');
 
   // Stats Calculations
   const stats = useMemo(() => {
@@ -331,7 +332,16 @@ export default function AdminDashboard({
       }
 
       if (statusText) {
-        const msg = `${emoji} อัปเดตสถานะการจอง!\nห้องพัก: ${booking.roomNumber}\nผู้เช่า: ${booking.guestName}\nเบอร์โทร: ${booking.guestPhone}\nสถานะใหม่: ${statusText}\nอัปเดตเมื่อ: ${new Date().toLocaleTimeString('th-TH')}`;
+        const msg = `⚙️ [${settings.propertyName || 'DORMYHUB'} - อัปเดตสถานะผู้เข้าพัก]
+──────────────────────────
+ห้องพัก: Room ${booking.roomNumber}
+ผู้เข้าพัก: คุณ ${booking.guestName}
+เบอร์โทร: ${booking.guestPhone}
+──────────────────────────
+🛎️ สถานะใหม่: ${statusText}
+📅 ดำเนินการเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+──────────────────────────
+ยินดีให้บริการเสมอ หากมีข้อสงสัยหรือต้องการความช่วยเหลือ สามารถติดต่อผู้ดูแลได้ทันทีครับ 😊`;
         sendLineNotification(settings, msg).catch(err => console.error('Failed to send status change notification', err));
       }
     }
@@ -378,7 +388,30 @@ export default function AdminDashboard({
 
     // LINE Notification on Invoice Created
     if (settings.lineNotificationEnabled) {
-      const msg = `📝 ออกใบแจ้งหนี้ใหม่!\nห้องพัก: ${newInvoice.roomNumber}\nประจำเดือน: ${newInvoice.billingMonth}\nค่าไฟ: ${newInvoice.electricityCost.toLocaleString()} บาท (${newInvoice.currElectricity - newInvoice.prevElectricity} หน่วย)\nค่าน้ำ: ${newInvoice.waterCost.toLocaleString()} บาท (${newInvoice.currWater - newInvoice.prevWater} หน่วย)\nค่าส่วนกลาง: ${newInvoice.commonFee.toLocaleString()} บาท\n💰 ยอดรวมสุทธิ: ${newInvoice.totalCost.toLocaleString()} บาท\nสถานะ: รอการชำระเงิน ⏳`;
+      const elecUnits = newInvoice.currElectricity - newInvoice.prevElectricity;
+      const watUnits = newInvoice.currWater - newInvoice.prevWater;
+      const msg = `📝 [${settings.propertyName || 'DORMYHUB'} - ใบแจ้งค่าบริการรายเดือน]
+──────────────────────────
+ห้องพัก: Room ${newInvoice.roomNumber}
+ประจำงวด: ${newInvoice.billingMonth}
+──────────────────────────
+🔌 ค่าไฟฟ้า (Electricity)
+   • เลขมิเตอร์: ${newInvoice.prevElectricity} → ${newInvoice.currElectricity} kWh
+   • การใช้งาน: ${elecUnits} หน่วย (* ${newInvoice.electricityUnitRate} บาท)
+   • รวมเป็นเงิน: ฿${newInvoice.electricityCost.toLocaleString()} บาท
+──────────────────────────
+💧 ค่าน้ำประปา (Water)
+   • เลขมิเตอร์: ${newInvoice.prevWater} → ${newInvoice.currWater} m³
+   • การใช้งาน: ${watUnits} หน่วย (* ${newInvoice.waterUnitRate} บาท)
+   • รวมเป็นเงิน: ฿${newInvoice.waterCost.toLocaleString()} บาท
+──────────────────────────
+🏢 ค่าบริการส่วนกลาง: ฿${newInvoice.commonFee.toLocaleString()} บาท
+──────────────────────────
+💰 ยอดรวมสุทธิ: ฿${newInvoice.totalCost.toLocaleString()} บาท
+⏳ สถานะบิล: รอการชำระเงิน ⏳
+──────────────────────────
+💡 กรุณาชำระเงินและส่งหลักฐานผ่านหน้าระบบหอพัก
+ขอบคุณที่เลือกใช้บริการหอพักของเราครับ 🙏`;
       sendLineNotification(settings, msg).catch(err => console.error('Failed to send invoice notification', err));
     }
 
@@ -403,13 +436,98 @@ export default function AdminDashboard({
     }));
 
     if (invoice && settings.lineNotificationEnabled) {
-      const msg = `✅ ชำระเงินเรียบร้อยแล้ว!\nห้องพัก: ${invoice.roomNumber}\nประจำเดือน: ${invoice.billingMonth}\n💰 ยอดเงินที่รับชำระ: ${invoice.totalCost.toLocaleString()} บาท\nวันเวลาที่บันทึก: ${new Date().toLocaleTimeString('th-TH')} (${new Date().toLocaleDateString('th-TH')})\nขอบคุณสำหรับความร่วมมือครับ 🙏`;
+      const msg = `✅ [${settings.propertyName || 'DORMYHUB'} - ยืนยันการชำระเงิน]
+──────────────────────────
+ห้องพัก: Room ${invoice.roomNumber}
+ประจำงวด: ${invoice.billingMonth}
+──────────────────────────
+💰 ยอดเงินรับชำระ: ฿${invoice.totalCost.toLocaleString()} บาท
+📅 วันที่บันทึกชำระ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+📋 สถานะการชำระเงิน: ชำระสำเร็จเรียบร้อยแล้ว
+──────────────────────────
+ทางหอพักได้รับยอดชำระแล้ว ขอบคุณสำหรับความร่วมมือและขอให้มีความสุขกับการพักอาศัยครับ 🙏✨`;
       sendLineNotification(settings, msg).catch(err => console.error('Failed to send payment notification', err));
     }
   };
 
+  // Generate beautiful text message for each simulation tab
+  const getSimulatedMessageText = (tab: 'booking' | 'invoice' | 'payment' | 'status') => {
+    const property = settings.propertyName || 'DORMYHUB';
+    const month = selectedBillingMonth || 'มิถุนายน 2569';
+    const elecPrice = 150 * settings.electricityUnitRate;
+    const watPrice = 15 * settings.waterUnitRate;
+    const totalInvoice = elecPrice + watPrice + settings.commonFee;
+
+    switch (tab) {
+      case 'booking':
+        return `✨ [${property} - แจ้งเตือนจองห้องพักใหม่]
+──────────────────────────
+รหัสการจอง: BK-729481
+ห้องพัก: Room 101 (Deluxe)
+ประเภทการจอง: รายเดือน (Monthly)
+──────────────────────────
+👤 ผู้จอง: คุณ สมชาย รักดี
+📞 เบอร์โทร: 081-234-5678
+📅 เช็คอิน: 01/10/2026
+📅 เช็คเอาท์: 01/11/2026
+──────────────────────────
+💰 ยอดเงินมัดจำ: ฿${(5500 * (settings.securityDepositMultiplier || 1)).toLocaleString()} บาท
+⏳ สถานะ: รอการเช็คอินเข้าพัก ⏳
+──────────────────────────
+ระบบบันทึกเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}`;
+
+      case 'invoice':
+        return `📝 [${property} - ใบแจ้งค่าบริการรายเดือน]
+──────────────────────────
+ห้องพัก: Room 101
+ประจำงวด: ${month}
+──────────────────────────
+🔌 ค่าไฟฟ้า (Electricity)
+   • เลขมิเตอร์: 1200 → 1350 kWh
+   • การใช้งาน: 150 หน่วย (* ${settings.electricityUnitRate} บาท)
+   • รวมเป็นเงิน: ฿${elecPrice.toLocaleString()} บาท
+──────────────────────────
+💧 ค่าน้ำประปา (Water)
+   • เลขมิเตอร์: 450 → 465 m³
+   • การใช้งาน: 15 หน่วย (* ${settings.waterUnitRate} บาท)
+   • รวมเป็นเงิน: ฿${watPrice.toLocaleString()} บาท
+──────────────────────────
+🏢 ค่าบริการส่วนกลาง: ฿${settings.commonFee.toLocaleString()} บาท
+──────────────────────────
+💰 ยอดรวมสุทธิ: ฿${totalInvoice.toLocaleString()} บาท
+⏳ สถานะบิล: รอการชำระเงิน ⏳
+──────────────────────────
+💡 กรุณาชำระเงินและส่งหลักฐานผ่านหน้าระบบหอพัก
+ขอบคุณที่เลือกใช้บริการหอพักของเราครับ 🙏`;
+
+      case 'payment':
+        return `✅ [${property} - ยืนยันการชำระเงิน]
+──────────────────────────
+ห้องพัก: Room 101
+ประจำงวด: ${month}
+──────────────────────────
+💰 ยอดเงินรับชำระ: ฿${totalInvoice.toLocaleString()} บาท
+📅 วันที่บันทึกชำระ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+📋 สถานะการชำระเงิน: ชำระสำเร็จเรียบร้อยแล้ว
+──────────────────────────
+ทางหอพักได้รับยอดชำระแล้ว ขอบคุณสำหรับความร่วมมือและขอให้มีความสุขกับการพักอาศัยครับ 🙏✨`;
+
+      case 'status':
+        return `⚙️ [${property} - อัปเดตสถานะผู้เข้าพัก]
+──────────────────────────
+ห้องพัก: Room 101
+ผู้เข้าพัก: คุณ สมชาย รักดี
+เบอร์โทร: 081-234-5678
+──────────────────────────
+🛎️ สถานะใหม่: เช็คอินเข้าพัก (Check-in) 🛎️
+📅 ดำเนินการเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
+──────────────────────────
+ยินดีต้อนรับเข้าพักหอพักของเราอย่างเป็นทางการ หากมีข้อสงสัยหรือพบปัญหาในห้องพัก สามารถติดต่อแอดมินได้ตลอดเวลาครับ 😊`;
+    }
+  };
+
   // Test LINE notification
-  const handleTestLineNotification = async () => {
+  const handleTestLineNotification = async (customMsg?: string) => {
     setLineTestLoading(true);
     setLineTestResult(null);
     const tokenType = settings.lineTokenType || 'MessagingApi';
@@ -424,13 +542,13 @@ export default function AdminDashboard({
     if (!isConfigured) {
       setLineTestResult({
         success: false,
-        message: 'กรุณากรอก Token ให้เรียบร้อยก่อนทดสอบ',
+        message: 'กรุณากรอกข้อมูลการเชื่อมต่อและเปิดใช้งาน LINE ด้านบนก่อนทดสอบส่งสลิปจริง',
       });
       setLineTestLoading(false);
       return;
     }
 
-    const testMsg = `🔔 ทดสอบระบบแจ้งเตือนไลน์หอพัก\nสถานที่: ${settings.propertyName || 'DORMYHUB'}\nสถานะเชื่อมต่อ: สำเร็จแล้ว! 🎉\nเวลา: ${new Date().toLocaleTimeString('th-TH')}`;
+    const testMsg = customMsg || `🔔 ทดสอบระบบแจ้งเตือนไลน์หอพัก\nสถานที่: ${settings.propertyName || 'DORMYHUB'}\nสถานะเชื่อมต่อ: สำเร็จแล้ว! 🎉\nเวลา: ${new Date().toLocaleTimeString('th-TH')}`;
     
     const result = await testLineNotification({
       tokenType,
@@ -443,7 +561,7 @@ export default function AdminDashboard({
     if (result.success) {
       setLineTestResult({
         success: true,
-        message: 'ส่งข้อความทดสอบไปยัง LINE เรียบร้อยแล้ว! กรุณาตรวจสอบโทรศัพท์ของคุณ',
+        message: 'ส่งข้อความสำเร็จ! สลิปการแจ้งเตือนรูปแบบมืออาชีพถูกส่งไปยังห้องแชท LINE ของคุณแล้ว',
       });
     } else {
       setLineTestResult({
@@ -2012,7 +2130,7 @@ export default function AdminDashboard({
                             className={`py-3 px-4 rounded-xl text-xs font-bold border transition-all duration-300 cursor-pointer flex flex-col items-center gap-1.5 justify-center ${
                               (settings.lineTokenType || 'Notify') === 'Notify'
                                 ? 'bg-rose-500/10 border-rose-500/40 text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.1)]'
-                                : 'bg-[#0a0a0f] border-white/5 text-slate-550 hover:text-slate-400 hover:border-white/10'
+                                : 'bg-[#0a0a0f] border-white/5 text-slate-350 hover:text-slate-400 hover:border-white/10'
                             }`}
                           >
                             <span className="line-through flex items-center gap-1 text-slate-400">💬 LINE Notify</span>
@@ -2105,59 +2223,59 @@ export default function AdminDashboard({
                             </ul>
                           </div>
 
+                          {/* Test Connection Button */}
+                          <div className="pt-3">
+                            <button
+                              type="button"
+                              disabled={lineTestLoading}
+                              onClick={() => handleTestLineNotification()}
+                              className="w-full bg-[#0a0a0f] border border-white/10 hover:border-emerald-500 hover:bg-emerald-500/5 text-white py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              {lineTestLoading ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+                                  <span>กำลังร้องขอการเชื่อมต่อ LINE...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="w-4 h-4 text-emerald-400" />
+                                  <span>ส่งข้อความทดลองการแจ้งเตือนทันที (Test Connection)</span>
+                                </>
+                              )}
+                            </button>
+
+                            {lineTestResult && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`mt-4 p-4 rounded-xl text-xs flex items-start gap-3 border ${
+                                  lineTestResult.success
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                }`}
+                              >
+                                {lineTestResult.success ? (
+                                  <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+                                ) : (
+                                  <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                                )}
+                                <div className="flex flex-col gap-1.5 flex-1">
+                                  <span className="font-bold text-sm">
+                                    {lineTestResult.success ? 'เชื่อมโยงระบบสำเร็จ!' : 'เชื่อมโยงไม่สำเร็จ'}
+                                  </span>
+                                  <p className="leading-relaxed opacity-90">{lineTestResult.message}</p>
+                                  {!lineTestResult.success && (
+                                    <div className="text-xs text-slate-400 border-t border-rose-500/10 pt-2.5 mt-1 leading-relaxed">
+                                      💡 <strong>วิธีแก้ไข:</strong> หากระบบขึ้น Error โค้ด 404/400 หรือเชื่อมไม่ได้ กรุณากดปุ่ม <strong>รีเฟรชเบราว์เซอร์ของคุณ (F5)</strong> หรือปิดและเปิดแท็บเว็บนี้ใหม่อีกครั้ง เพื่ออัปเดตแคช API ของระบบเชื่อมต่อเซิร์ฟเวอร์หลังบ้านครับ
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </div>
+
                         </div>
                       )}
-
-                      {/* Test Connection Button */}
-                      <div className="pt-3">
-                        <button
-                          type="button"
-                          disabled={lineTestLoading}
-                          onClick={handleTestLineNotification}
-                          className="w-full bg-[#0a0a0f] border border-white/10 hover:border-emerald-500 hover:bg-emerald-500/5 text-white py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                        >
-                          {lineTestLoading ? (
-                            <>
-                              <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
-                              <span>กำลังร้องขอการเชื่อมต่อ LINE...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send className="w-4 h-4 text-emerald-400" />
-                              <span>ส่งข้อความทดลองการแจ้งเตือนทันที (Test Connection)</span>
-                            </>
-                          )}
-                        </button>
-
-                        {lineTestResult && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`mt-4 p-4 rounded-xl text-xs flex items-start gap-3 border ${
-                              lineTestResult.success
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                            }`}
-                          >
-                            {lineTestResult.success ? (
-                              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
-                            ) : (
-                              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
-                            )}
-                            <div className="flex flex-col gap-1.5 flex-1">
-                              <span className="font-bold text-sm">
-                                {lineTestResult.success ? 'เชื่อมโยงระบบสำเร็จ!' : 'เชื่อมโยงไม่สำเร็จ'}
-                              </span>
-                              <p className="leading-relaxed opacity-90">{lineTestResult.message}</p>
-                              {!lineTestResult.success && (
-                                <div className="text-xs text-slate-400 border-t border-rose-500/10 pt-2.5 mt-1 leading-relaxed">
-                                  💡 <strong>วิธีแก้ไข:</strong> หากระบบขึ้น Error โค้ด 404/400 หรือเชื่อมไม่ได้ กรุณากดปุ่ม <strong>รีเฟรชเบราว์เซอร์ของคุณ (F5)</strong> หรือปิดและเปิดแท็บเว็บนี้ใหม่อีกครั้ง เพื่ออัปเดตแคช API ของระบบเชื่อมต่อเซิร์ฟเวอร์หลังบ้านครับ
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-                      </div>
                     </motion.div>
                   ) : (
                     <div className="text-center py-6 bg-slate-900/40 border border-dashed border-white/5 rounded-xl text-slate-500 text-xs">
@@ -2237,6 +2355,29 @@ export default function AdminDashboard({
                   </p>
                 </div>
 
+                {/* Simulated Tabs Selector (Awwwards Style) */}
+                <div className="flex bg-[#0a0a0f] border border-white/5 rounded-2xl p-1 gap-1 shadow-inner select-none">
+                  {[
+                    { id: 'booking', label: 'จองห้องพัก' },
+                    { id: 'invoice', label: 'บิลรายงวด' },
+                    { id: 'payment', label: 'รับยอดเงิน' },
+                    { id: 'status', label: 'ผู้เช่าเช็คอิน' }
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSimActiveTab(tab.id as any)}
+                      className={`flex-1 text-[10px] sm:text-[11px] font-bold py-2 px-1 rounded-xl transition-all duration-300 cursor-pointer ${
+                        simActiveTab === tab.id
+                          ? 'bg-gradient-to-tr from-emerald-500/15 to-teal-500/15 text-emerald-400 border border-emerald-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="bg-[#121217] border border-white/10 rounded-[40px] p-4.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] w-full max-w-[340px] mx-auto aspect-[9/18.5] flex flex-col relative overflow-hidden backdrop-blur-xl">
                   {/* Speaker & Dynamic Island notch */}
                   <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-full z-20 flex items-center justify-center">
@@ -2281,56 +2422,128 @@ export default function AdminDashboard({
                   </div>
 
                   {/* Simulated Conversation Message Area */}
-                  <div className="flex-1 bg-[#16171d] p-3.5 overflow-y-auto space-y-4 font-sans text-xs scrollbar-none">
+                  <div className="flex-1 bg-[#16171d] p-3 overflow-y-auto space-y-4 font-sans text-xs scrollbar-none max-h-[380px]">
                     <div className="text-[9px] text-slate-600 text-center select-none font-mono tracking-wider">TODAY</div>
                     
                     {/* Bot profile bubble */}
-                    <div className="flex items-start gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-md">
+                    <div className="flex items-start gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-[9px] font-bold text-white shrink-0 shadow-md">
                         DB
                       </div>
-                      <div className="space-y-1.5 max-w-[85%]">
-                        <span className="text-[10px] text-slate-500 block">DormyBot AI</span>
+                      <div className="space-y-1 max-w-[88%] flex-1">
+                        <span className="text-[9px] text-slate-500 block">DormyBot AI</span>
                         
                         {/* Live Message bubble */}
-                        <div className="bg-[#242834] border border-white/5 text-slate-200 p-3 rounded-2xl rounded-tl-sm shadow-md font-mono whitespace-pre-wrap text-[10px] leading-relaxed relative">
+                        <div className="bg-[#1e202a] border border-white/5 text-slate-200 p-3 rounded-xl rounded-tl-none shadow-md font-mono whitespace-pre-wrap text-[9px] leading-relaxed relative font-light">
                           <div className="absolute top-0 right-0 w-2 h-2 rounded-full bg-emerald-500/20 animate-ping m-1.5" />
                           
                           {/* Live preview formatted content */}
-                          <div className="text-emerald-400 font-bold border-b border-white/5 pb-1 mb-1.5 flex items-center gap-1.5 select-none">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            {settings.propertyName || 'DORMYHUB'} MSG PREVIEW
-                          </div>
-                          
-                          <span className="text-white font-sans text-xs">
-                            🔔 ทดสอบระบบแจ้งเตือนไลน์หอพัก<br/>
-                            สถานที่: <span className="text-emerald-400 font-semibold">{settings.propertyName || 'DORMYHUB'}</span><br/>
-                            สถานะเชื่อมต่อ: สำเร็จแล้ว! 🎉<br/>
-                            ระบบบอท: <span className="text-indigo-400">Messaging API (Active)</span><br/>
-                            เป้าหมาย: <span className="text-amber-400">{settings.lineUserId ? settings.lineUserId.slice(0, 10) + '...' : 'ส่งแบบ Broadcast'}</span>
-                          </span>
+                          {simActiveTab === 'booking' && (
+                            <div className="text-white">
+                              <span className="text-emerald-400 font-bold block mb-1">✨ [{settings.propertyName || 'DORMYHUB'} - จองใหม่]</span>
+                              ──────────────────<br/>
+                              รหัสการจอง: <span className="text-brand-400 font-bold">BK-729481</span><br/>
+                              ห้องพัก: Room 101 (Deluxe)<br/>
+                              ประเภท: รายเดือน (Monthly)<br/>
+                              ──────────────────<br/>
+                              👤 ผู้จอง: คุณ สมชาย รักดี<br/>
+                              📞 เบอร์โทร: 081-234-5678<br/>
+                              📅 เช็คอิน: 01/10/2026<br/>
+                              📅 เช็คเอาท์: 01/11/2026<br/>
+                              ──────────────────<br/>
+                              💰 มัดจำ: <span className="text-amber-400 font-bold">฿{(5500 * (settings.securityDepositMultiplier || 1)).toLocaleString()} บาท</span><br/>
+                              ⏳ สถานะ: <span className="text-yellow-400 font-medium">รอเช็คอินเข้าพัก ⏳</span>
+                            </div>
+                          )}
+
+                          {simActiveTab === 'invoice' && (
+                            <div className="text-white text-[8.5px] leading-tight">
+                              <span className="text-emerald-400 font-bold block mb-1">📝 [{settings.propertyName || 'DORMYHUB'} - ใบแจ้งหนี้]</span>
+                              ──────────────────<br/>
+                              ห้องพัก: Room 101<br/>
+                              ประจำงวด: {selectedBillingMonth || 'มิถุนายน 2569'}<br/>
+                              ──────────────────<br/>
+                              🔌 <span className="text-amber-300 font-medium">ค่าไฟฟ้า (Electricity)</span><br/>
+                              &nbsp;&nbsp;• มิเตอร์: 1200 → 1350 kWh<br/>
+                              &nbsp;&nbsp;• ยอดใช้: 150 หน่วย (* {settings.electricityUnitRate} บ.)<br/>
+                              &nbsp;&nbsp;• รวมเงิน: ฿{(150 * settings.electricityUnitRate).toLocaleString()} บ.<br/>
+                              💧 <span className="text-sky-300 font-medium">ค่าน้ำประปา (Water)</span><br/>
+                              &nbsp;&nbsp;• มิเตอร์: 450 → 465 m³<br/>
+                              &nbsp;&nbsp;• ยอดใช้: 15 หน่วย (* {settings.waterUnitRate} บ.)<br/>
+                              &nbsp;&nbsp;• รวมเงิน: ฿{(15 * settings.waterUnitRate).toLocaleString()} บ.<br/>
+                              🏢 ส่วนกลาง: ฿{settings.commonFee.toLocaleString()} บ.<br/>
+                              ──────────────────<br/>
+                              💰 ยอดรวม: <span className="text-emerald-400 font-extrabold text-xs">฿{((150 * settings.electricityUnitRate) + (15 * settings.waterUnitRate) + settings.commonFee).toLocaleString()} บาท</span><br/>
+                              ⏳ สถานะ: <span className="text-rose-400 font-medium">รอการชำระเงิน ⏳</span>
+                            </div>
+                          )}
+
+                          {simActiveTab === 'payment' && (
+                            <div className="text-white">
+                              <span className="text-emerald-400 font-bold block mb-1">✅ [{settings.propertyName || 'DORMYHUB'} - รับชำระ]</span>
+                              ──────────────────<br/>
+                              ห้องพัก: Room 101<br/>
+                              ประจำงวด: {selectedBillingMonth || 'มิถุนายน 2569'}<br/>
+                              ──────────────────<br/>
+                              💰 ยอดชำระ: <span className="text-emerald-400 font-bold">฿{((150 * settings.electricityUnitRate) + (15 * settings.waterUnitRate) + settings.commonFee).toLocaleString()} บาท</span><br/>
+                              📅 วันที่ชำระ: {new Date().toLocaleDateString('th-TH')}<br/>
+                              📋 สถานะ: <span className="text-emerald-400 font-medium">ชำระสำเร็จเรียบร้อย</span><br/>
+                              ──────────────────<br/>
+                              ทางหอพัก {settings.propertyName || 'DORMYHUB'} ได้รับยอดเงินแล้ว ขอบคุณครับ 🙏✨
+                            </div>
+                          )}
+
+                          {simActiveTab === 'status' && (
+                            <div className="text-white">
+                              <span className="text-emerald-400 font-bold block mb-1">⚙️ [{settings.propertyName || 'DORMYHUB'} - สถานะผู้เช่า]</span>
+                              ──────────────────<br/>
+                              ห้องพัก: Room 101<br/>
+                              ผู้เช่า: คุณ สมชาย รักดี<br/>
+                              ──────────────────<br/>
+                              🛎️ สถานะใหม่: <span className="text-brand-400 font-bold">เช็คอิน (Check-in) 🛎️</span><br/>
+                              📅 เมื่อ: {new Date().toLocaleDateString('th-TH')}<br/>
+                              ──────────────────<br/>
+                              ยินดีต้อนรับสู่หอพักครับ หากต้องการติดต่อสามารถแอดมินได้ตลอดเวลา 😊
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Sim Action Switcher */}
-                    <div className="bg-white/[0.02] border border-white/5 rounded-xl p-2.5 mt-2 flex justify-between items-center text-[9px] text-slate-500 select-none">
-                      <span>💡 แนะนำ: เชื่อมต่อ API แล้วลองสร้างรายการบิลหรือบันทึกจองในหน้าระบบ ข้อความจริงจะถูกส่งหาท่านตามฟอร์แมตตัวอย่างนี้ทันที!</span>
+                    {/* Hint badge inside phone */}
+                    <div className="bg-slate-900/60 border border-white/5 rounded-lg p-2 text-[8.5px] text-slate-400 select-none leading-normal">
+                      💡 เมื่อเชื่อมต่อ API ระบบจะส่งข้อความสไตล์พรีเมียมแบบนี้เข้าห้องแชท LINE จริงทันที!
                     </div>
 
                   </div>
 
                   {/* Keyboard input area mockup */}
-                  <div className="bg-[#1e2029] p-2.5 rounded-b-2xl border-t border-black/10 flex items-center gap-2 select-none">
+                  <div className="bg-[#1e2029] p-2 rounded-b-2xl border-t border-black/10 flex items-center gap-2 select-none">
                     <div className="w-5 h-5 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-[10px] cursor-not-allowed">+</div>
-                    <div className="flex-1 bg-[#14151b] rounded-full py-1.5 px-3.5 text-[10px] text-slate-500 font-light border border-white/5">
+                    <div className="flex-1 bg-[#14151b] rounded-full py-1 px-3 text-[9px] text-slate-500 font-light border border-white/5">
                       ส่งข้อความแชทหาบอท...
                     </div>
-                    <svg className="w-5 h-5 text-emerald-500 cursor-not-allowed" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-emerald-500 cursor-not-allowed" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                 </div>
+
+                {/* Instant Send Simulated Message over LINE Real API Button */}
+                {settings.lineNotificationEnabled && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      const msgText = getSimulatedMessageText(simActiveTab);
+                      handleTestLineNotification(msgText);
+                    }}
+                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/10 transition-all duration-300"
+                  >
+                    <Send className="w-4 h-4" />
+                    ส่งสลิป &quot;{simActiveTab === 'booking' ? 'จองใหม่' : simActiveTab === 'invoice' ? 'ใบแจ้งหนี้' : simActiveTab === 'payment' ? 'ชำระเงิน' : 'อัปเดตสถานะ'}&quot; ทดสอบไปยังไลน์จริง ⚡
+                  </motion.button>
+                )}
 
                 {/* Info Tip badge card */}
                 <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-5 rounded-2xl text-xs flex gap-3 shadow-md">

@@ -77,7 +77,21 @@ export default function App() {
     // Send LINE Notification
     if (settings.lineNotificationEnabled) {
       const typeText = newBooking.bookingType === 'daily' ? 'รายวัน (Daily)' : 'รายเดือน (Monthly)';
-      const msg = `✨ มีรายการจองห้องพักใหม่!\nรหัสการจอง: ${newBooking.id}\nห้องพัก: ${newBooking.roomNumber}\nประเภทการจอง: ${typeText}\n👤 ผู้จอง: ${newBooking.guestName}\n📞 เบอร์โทร: ${newBooking.guestPhone}\n📅 เช็คอิน: ${newBooking.checkInDate}\n📅 เช็คเอาท์: ${newBooking.checkOutDate}\n💰 ยอดรวม: ${newBooking.totalPrice.toLocaleString()} บาท\nสถานะ: รอการเช็คอิน ⏳`;
+      const msg = `✨ [${settings.propertyName || 'DORMYHUB'} - แจ้งเตือนจองห้องพักใหม่]
+──────────────────────────
+รหัสการจอง: ${newBooking.id}
+ห้องพัก: Room ${newBooking.roomNumber}
+ประเภทการจอง: ${typeText}
+──────────────────────────
+👤 ผู้จอง: คุณ ${newBooking.guestName}
+📞 เบอร์โทร: ${newBooking.guestPhone}
+📅 เช็คอิน: ${newBooking.checkInDate}
+📅 เช็คเอาท์: ${newBooking.checkOutDate}
+──────────────────────────
+💰 ยอดรวม/มัดจำ: ฿${newBooking.totalPrice.toLocaleString()} บาท
+⏳ สถานะ: รอการเช็คอินเข้าพัก ⏳
+──────────────────────────
+ระบบบันทึกเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}`;
       sendLineNotification(settings, msg).catch(err => console.error('Failed to send booking notification', err));
     }
 
