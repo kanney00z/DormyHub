@@ -20,6 +20,7 @@ export interface Booking {
   guestName: string;
   guestPhone: string;
   guestEmail: string;
+  guestLine?: string;
   checkInDate: string;
   checkOutDate: string;
   bookingType: 'daily' | 'monthly';
@@ -63,4 +64,20 @@ export interface SystemSettings {
   lineNotifyToken?: string;
   lineChannelAccessToken?: string;
   lineUserId?: string;
+}
+
+export interface MaintenanceTicket {
+  id: string;
+  roomId: string;
+  roomNumber: string;
+  guestName: string;
+  guestPhone: string;
+  category: 'aircon' | 'plumbing' | 'electricity' | 'furniture' | 'other';
+  urgency: 'low' | 'medium' | 'high';
+  description: string;
+  status: 'Pending' | 'In Progress' | 'Resolved';
+  createdAt: string;
+  resolvedAt?: string;
+  photo?: string;
+  adminNotes?: string;
 }

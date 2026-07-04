@@ -1,4 +1,4 @@
-import { Room, Booking, UtilityInvoice, SystemSettings } from './types';
+import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from './types';
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   electricityUnitRate: 8, // 8 บาท/หน่วย
@@ -203,3 +203,34 @@ export const INITIAL_INVOICES: UtilityInvoice[] = [
     issueDate: '2026-05-31',
   }
 ];
+
+export const INITIAL_TICKETS: MaintenanceTicket[] = [
+  {
+    id: 'TC-2819',
+    roomId: 'room-102',
+    roomNumber: '102',
+    guestName: 'ศรัณย์ แซ่ตั้ง',
+    guestPhone: '081-234-5678',
+    category: 'aircon',
+    urgency: 'medium',
+    description: 'เครื่องปรับอากาศมีลมร้อนสลับเย็น และมีเสียงดังผิดปกติขณะทำงาน คาดว่าน้ำยาแอร์อาจจะรั่วหรือต้องการล้างทำความสะอาดแอร์ด่วนครับ',
+    status: 'In Progress',
+    createdAt: '2026-06-29T11:00:00Z',
+    photo: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=400&q=80',
+    adminNotes: 'ช่างนัดหมายเข้าตรวจสอบวันศุกร์นี้ เวลา 10:00 น.'
+  },
+  {
+    id: 'TC-1102',
+    roomId: 'room-202',
+    roomNumber: '202',
+    guestName: 'ดร. นภัสสร แก้วมณี',
+    guestPhone: '089-987-6543',
+    category: 'plumbing',
+    urgency: 'high',
+    description: 'ก๊อกน้ำในห้องน้ำมีน้ำรั่วซึมตลอดเวลา ทำให้พื้นเปียกตลอดวันและเสียงดังรบกวนเวลานอนค่ะ รบกวนส่งช่างมาแก้ไขด่วนที่สุดค่ะ',
+    status: 'Pending',
+    createdAt: '2026-07-01T08:30:00Z',
+    photo: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&w=400&q=80'
+  }
+];
+

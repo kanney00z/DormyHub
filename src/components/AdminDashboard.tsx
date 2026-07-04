@@ -4,9 +4,9 @@ import {
   Zap, Droplet, Users, Key, Settings, Plus, 
   Trash2, FileText, Check, Clock, TrendingUp, AlertTriangle, 
   Home, ClipboardList, CreditCard, ChevronRight, CheckCircle2, DollarSign, Edit3, X, HelpCircle,
-  Upload, Image as ImageIcon, Bell, Send, AlertCircle, Calendar, ChevronLeft
+  Upload, Image as ImageIcon, Bell, Send, AlertCircle, Calendar, ChevronLeft, Wrench, Sparkles
 } from 'lucide-react';
-import { Room, Booking, UtilityInvoice, SystemSettings } from '../types';
+import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from '../types';
 import { testLineNotification, sendLineNotification } from '../utils/line';
 
 const ROOM_IMAGE_PRESETS = [
@@ -21,10 +21,12 @@ interface AdminDashboardProps {
   bookings: Booking[];
   invoices: UtilityInvoice[];
   settings: SystemSettings;
+  tickets: MaintenanceTicket[];
   onUpdateRooms: (rooms: Room[]) => void;
   onUpdateBookings: (bookings: Booking[]) => void;
   onUpdateInvoices: (invoices: UtilityInvoice[]) => void;
   onUpdateSettings: (settings: SystemSettings) => void;
+  onUpdateTickets: (tickets: MaintenanceTicket[]) => void;
 }
 
 export default function AdminDashboard({
@@ -32,12 +34,14 @@ export default function AdminDashboard({
   bookings,
   invoices,
   settings,
+  tickets,
   onUpdateRooms,
   onUpdateBookings,
   onUpdateInvoices,
   onUpdateSettings,
+  onUpdateTickets,
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'rooms' | 'bookings' | 'utilities' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'rooms' | 'bookings' | 'utilities' | 'settings' | 'maintenance'>('overview');
   
   // Room Form State
   const [showAddRoom, setShowAddRoom] = useState(false);
@@ -55,6 +59,8 @@ export default function AdminDashboard({
   const [selectedRoomIdForBill, setSelectedRoomIdForBill] = useState('');
   const [inputCurrElectricity, setInputCurrElectricity] = useState<number | ''>('');
   const [inputCurrWater, setInputCurrWater] = useState<number | ''>('');
+  const [isElectricityMeterReset, setIsElectricityMeterReset] = useState(false);
+  const [isWaterMeterReset, setIsWaterMeterReset] = useState(false);
   const [selectedBillingMonth, setSelectedBillingMonth] = useState('มิถุนายน 2569');
   
   // Quick Edit Room status
@@ -62,10 +68,17 @@ export default function AdminDashboard({
   const [editDailyPrice, setEditDailyPrice] = useState(0);
   const [editMonthlyPrice, setEditMonthlyPrice] = useState(0);
   const [editStatus, setEditStatus] = useState<Room['status']>('Available');
+  const [editElectricityMeter, setEditElectricityMeter] = useState(0);
+  const [editWaterMeter, setEditWaterMeter] = useState(0);
   const [deleteConfirmRoomId, setDeleteConfirmRoomId] = useState<string | null>(null);
   const [deleteConfirmBookingId, setDeleteConfirmBookingId] = useState<string | null>(null);
   const [deleteConfirmInvoiceId, setDeleteConfirmInvoiceId] = useState<string | null>(null);
+  const [deleteConfirmTicketId, setDeleteConfirmTicketId] = useState<string | null>(null);
   const [filterHistoryRoomId, setFilterHistoryRoomId] = useState<string>('All');
+
+  // Maintenance Ticket close state
+  const [closingTicketId, setClosingTicketId] = useState<string | null>(null);
+  const [ticketCloseNotes, setTicketCloseNotes] = useState('');
 
   // Calendar State
   const [bookingViewMode, setBookingViewMode] = useState<'list' | 'calendar'>('list');
@@ -176,21 +189,26 @@ export default function AdminDashboard({
 
   // Utility Bill Calculation Preview
   const utilityBillPreview = useMemo(() => {
-    if (!selectedRoomForBill || inputCurrElectricity === '' || inputCurrWater === '') {
+    if (!selectedRoomForBill) {
       return null;
     }
     const prevElec = selectedRoomForBill.electricityMeter;
-    const currElec = Number(inputCurrElectricity);
+    const currElec = inputCurrElectricity !== '' ? Number(inputCurrElectricity) : prevElec;
     const prevWat = selectedRoomForBill.waterMeter;
-    const currWat = Number(inputCurrWater);
+    const currWat = inputCurrWater !== '' ? Number(inputCurrWater) : prevWat;
 
-    const elecUnits = Math.max(0, currElec - prevElec);
-    const watUnits = Math.max(0, currWat - prevWat);
+    // If meter reset, units = currMeter (starts from 0)
+    const elecUnits = isElectricityMeterReset ? currElec : Math.max(0, currElec - prevElec);
+    const watUnits = isWaterMeterReset ? currWat : Math.max(0, currWat - prevWat);
 
     const elecCost = elecUnits * settings.electricityUnitRate;
     const watCost = watUnits * settings.waterUnitRate;
     const common = settings.commonFee;
     const totalCost = elecCost + watCost + common;
+
+    // If reset, current doesn't need to be >= previous. Just >= 0 is fine.
+    const isElecValid = isElectricityMeterReset ? currElec >= 0 : currElec >= prevElec;
+    const isWatValid = isWaterMeterReset ? currWat >= 0 : currWat >= prevWat;
 
     return {
       elecUnits,
@@ -199,9 +217,9 @@ export default function AdminDashboard({
       watCost,
       common,
       totalCost,
-      isValid: currElec >= prevElec && currWat >= prevWat
+      isValid: isElecValid && isWatValid
     };
-  }, [selectedRoomForBill, inputCurrElectricity, inputCurrWater, settings]);
+  }, [selectedRoomForBill, inputCurrElectricity, inputCurrWater, isElectricityMeterReset, isWaterMeterReset, settings]);
 
   // Handlers for image file upload
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -278,6 +296,8 @@ export default function AdminDashboard({
     setEditDailyPrice(room.dailyPrice);
     setEditMonthlyPrice(room.monthlyPrice);
     setEditStatus(room.status);
+    setEditElectricityMeter(room.electricityMeter);
+    setEditWaterMeter(room.waterMeter);
   };
 
   const handleSaveRoomEdit = (id: string) => {
@@ -287,13 +307,61 @@ export default function AdminDashboard({
           ...room,
           dailyPrice: editDailyPrice,
           monthlyPrice: editMonthlyPrice,
-          status: editStatus
+          status: editStatus,
+          electricityMeter: editElectricityMeter,
+          waterMeter: editWaterMeter
         };
       }
       return room;
     });
     onUpdateRooms(updated);
     setEditingRoomId(null);
+  };
+
+  // Handle Update Maintenance Ticket Status
+  const handleUpdateTicketStatus = (ticketId: string, newStatus: 'Pending' | 'In Progress' | 'Resolved', adminNotes: string) => {
+    const updatedTickets = tickets.map(t => {
+      if (t.id === ticketId) {
+        return {
+          ...t,
+          status: newStatus,
+          adminNotes: adminNotes,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return t;
+    });
+    onUpdateTickets(updatedTickets);
+
+    // Send LINE Notification
+    const ticket = tickets.find(t => t.id === ticketId);
+    if (ticket && settings.lineNotificationEnabled) {
+      const categoryLabel = 
+        ticket.category === 'aircon' ? 'เครื่องปรับอากาศ (Aircon)' :
+        ticket.category === 'plumbing' ? 'ระบบประปา/สุขภัณฑ์ (Plumbing)' :
+        ticket.category === 'electricity' ? 'ระบบไฟฟ้า (Electricity)' :
+        ticket.category === 'furniture' ? 'เฟอร์นิเจอร์ (Furniture)' : 'อื่นๆ (Other)';
+        
+      const statusLabel = 
+        newStatus === 'Resolved' ? '🛠️ ซ่อมเสร็จสิ้นเรียบร้อย (Resolved)' :
+        newStatus === 'In Progress' ? '⚙️ กำลังเข้าซ่อมบำรุง (In Progress)' : '⏳ รอดำเนินการ (Pending)';
+
+      const msg = `🔧 [${settings.propertyName || 'DORMYHUB'} - อัปเดตงานแจ้งซ่อม]\n` +
+                  `──────────────────\n` +
+                  `รหัสงาน: ${ticket.id}\n` +
+                  `ห้องพัก: ห้อง ${ticket.roomNumber}\n` +
+                  `หมวดหมู่: ${categoryLabel}\n` +
+                  `รายละเอียด: ${ticket.description}\n` +
+                  `──────────────────\n` +
+                  `สถานะใหม่: ${statusLabel}\n` +
+                  `บันทึกรายงานช่าง: ${adminNotes}\n` +
+                  `──────────────────\n` +
+                  `ผู้แจ้ง: ${ticket.guestName} (${ticket.guestPhone})\n` +
+                  `อัปเดตเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}`;
+
+      sendLineNotification(settings, msg)
+        .catch(err => console.error('Error sending LINE notification:', err));
+    }
   };
 
   // Handle Booking Check-in/Out/Actions
@@ -337,6 +405,7 @@ export default function AdminDashboard({
 ห้องพัก: Room ${booking.roomNumber}
 ผู้เข้าพัก: คุณ ${booking.guestName}
 เบอร์โทร: ${booking.guestPhone}
+💬 LINE ID: ${booking.guestLine || 'ไม่ได้ระบุ'}
 ──────────────────────────
 🛎️ สถานะใหม่: ${statusText}
 📅 ดำเนินการเมื่อ: ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}
@@ -352,15 +421,18 @@ export default function AdminDashboard({
     e.preventDefault();
     if (!selectedRoomForBill || !utilityBillPreview || !utilityBillPreview.isValid) return;
 
+    const currElecValue = inputCurrElectricity !== '' ? Number(inputCurrElectricity) : selectedRoomForBill.electricityMeter;
+    const currWatValue = inputCurrWater !== '' ? Number(inputCurrWater) : selectedRoomForBill.waterMeter;
+
     const newInvoice: UtilityInvoice = {
       id: `inv-${selectedRoomForBill.number}-${Date.now().toString().slice(-4)}`,
       roomId: selectedRoomForBill.id,
       roomNumber: selectedRoomForBill.number,
       billingMonth: selectedBillingMonth,
-      prevElectricity: selectedRoomForBill.electricityMeter,
-      currElectricity: Number(inputCurrElectricity),
-      prevWater: selectedRoomForBill.waterMeter,
-      currWater: Number(inputCurrWater),
+      prevElectricity: isElectricityMeterReset ? 0 : selectedRoomForBill.electricityMeter,
+      currElectricity: currElecValue,
+      prevWater: isWaterMeterReset ? 0 : selectedRoomForBill.waterMeter,
+      currWater: currWatValue,
       electricityUnitRate: settings.electricityUnitRate,
       waterUnitRate: settings.waterUnitRate,
       electricityCost: utilityBillPreview.elecCost,
@@ -376,8 +448,8 @@ export default function AdminDashboard({
       if (r.id === selectedRoomForBill.id) {
         return {
           ...r,
-          electricityMeter: Number(inputCurrElectricity),
-          waterMeter: Number(inputCurrWater)
+          electricityMeter: currElecValue,
+          waterMeter: currWatValue
         };
       }
       return r;
@@ -419,6 +491,8 @@ export default function AdminDashboard({
     setSelectedRoomIdForBill('');
     setInputCurrElectricity('');
     setInputCurrWater('');
+    setIsElectricityMeterReset(false);
+    setIsWaterMeterReset(false);
   };
 
   // Pay invoice
@@ -584,7 +658,7 @@ export default function AdminDashboard({
               <Key className="w-5 h-5 text-white stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold tracking-tight text-white leading-none bg-gradient-to-r from-brand-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent">DormyHub</h2>
+              <h2 className="text-lg font-extrabold tracking-tight text-white leading-none bg-gradient-to-r from-brand-400 via-blue-400 to-indigo-300 bg-clip-text text-transparent">{settings.propertyName || 'DormyHub'}</h2>
               <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mt-1 block">OPERATIONS</span>
             </div>
           </div>
@@ -596,10 +670,12 @@ export default function AdminDashboard({
               { id: 'rooms', label: 'จัดการยูนิต/ห้องพัก', icon: Key },
               { id: 'bookings', label: 'ประวัติการจองห้อง', icon: ClipboardList },
               { id: 'utilities', label: 'บันทึกค่าน้ำค่าไฟ', icon: Zap },
+              { id: 'maintenance', label: 'แจ้งซ่อม/ปัญหาอาคาร', icon: Wrench },
               { id: 'settings', label: 'ตั้งค่าระบบกลาง', icon: Settings },
             ].map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const pendingTicketsCount = tickets.filter(t => t.status === 'Pending').length;
               return (
                 <button
                   key={item.id}
@@ -621,6 +697,11 @@ export default function AdminDashboard({
                   {item.id === 'utilities' && stats.pendingUtilityInvoices > 0 && (
                     <span className="ml-auto bg-rose-500 text-white font-bold text-xxs px-2 py-0.5 rounded-full">
                       {stats.pendingUtilityInvoices}
+                    </span>
+                  )}
+                  {item.id === 'maintenance' && pendingTicketsCount > 0 && (
+                    <span className="ml-auto bg-amber-500 text-slate-950 font-bold text-xxs px-2 py-0.5 rounded-full">
+                      {pendingTicketsCount}
                     </span>
                   )}
                 </button>
@@ -1143,12 +1224,32 @@ export default function AdminDashboard({
                             id={`edit-status-${room.number}`}
                             value={editStatus}
                             onChange={(e) => setEditStatus(e.target.value as any)}
-                            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white"
+                            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white h-[26px]"
                           >
                             <option value="Available">พร้อมให้เช่า</option>
                             <option value="Occupied">มีผู้เข้าพัก</option>
                             <option value="Maintenance">ปิดปรับปรุง</option>
                           </select>
+                        </div>
+                        <div>
+                          <span className="text-xxs text-slate-400 block mb-1">⚡ มิเตอร์ไฟ (kWh)</span>
+                          <input
+                            id={`edit-meter-elec-${room.number}`}
+                            type="number"
+                            value={editElectricityMeter}
+                            onChange={(e) => setEditElectricityMeter(Number(e.target.value))}
+                            className="w-24 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-xxs text-slate-400 block mb-1">💧 มิเตอร์น้ำ (m³)</span>
+                          <input
+                            id={`edit-meter-water-${room.number}`}
+                            type="number"
+                            value={editWaterMeter}
+                            onChange={(e) => setEditWaterMeter(Number(e.target.value))}
+                            className="w-24 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs text-white font-mono"
+                          />
                         </div>
                         <div className="flex items-end gap-1 pt-3">
                           <button
@@ -1322,6 +1423,11 @@ export default function AdminDashboard({
                               <div className="text-xxs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                 <span>📞 {book.guestPhone}</span>
                                 <span>✉️ {book.guestEmail}</span>
+                                {book.guestLine && (
+                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1 py-0.5 rounded text-[10px] font-mono inline-block">
+                                    💬 LINE: {book.guestLine}
+                                  </span>
+                                )}
                                 {book.paymentMethod && (
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold inline-flex items-center gap-0.5 ${
                                     book.paymentMethod === 'PromptPay' 
@@ -1823,31 +1929,78 @@ export default function AdminDashboard({
                         </div>
                       </div>
 
+                      {/* Active Tenant Information & LINE ID */}
+                      {(() => {
+                        const activeBooking = bookings.find(b => b.roomId === selectedRoomForBill.id && b.status === 'Active');
+                        if (!activeBooking) return null;
+                        return (
+                          <div className="bg-[#0c1410] p-4 rounded-xl border border-emerald-950 text-xs text-slate-400 space-y-2">
+                            <span className="font-bold text-emerald-400 flex items-center gap-1">
+                              👤 ผู้เช่าปัจจุบัน (Active Tenant):
+                            </span>
+                            <div className="flex justify-between text-[11px]">
+                              <span>ชื่อผู้เช่า:</span>
+                              <span className="font-bold text-slate-200">{activeBooking.guestName}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px]">
+                              <span>เบอร์โทร:</span>
+                              <span className="font-bold text-slate-200">{activeBooking.guestPhone}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px] pt-1 border-t border-emerald-950/40">
+                              <span>LINE ID:</span>
+                              <span className="font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/20 px-1.5 py-0.5 rounded font-mono">
+                                {activeBooking.guestLine || 'ไม่ได้ระบุ'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Current inputs */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-xxs text-slate-400 block mb-1">🔌 เลขไฟปัจจุบัน (kWh)</label>
+                          <label className="text-xxs text-slate-400 block mb-1">
+                            🔌 เลขไฟปัจจุบัน (kWh) <span className="text-brand-400 font-light block mt-0.5">(เว้นว่าง = ยังไม่จด/เป็น 0)</span>
+                          </label>
                           <input
                             id="utility-curr-electricity"
                             type="number"
-                            required
-                            placeholder={`>= ${selectedRoomForBill.electricityMeter}`}
+                            placeholder="ปล่อยว่าง = 0 หน่วย"
                             value={inputCurrElectricity}
                             onChange={(e) => setInputCurrElectricity(e.target.value === '' ? '' : Number(e.target.value))}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-500 text-white"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-white"
                           />
+                          <label className="flex items-center gap-1.5 mt-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isElectricityMeterReset}
+                              onChange={(e) => setIsElectricityMeterReset(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-0 cursor-pointer"
+                            />
+                            <span className="text-[10px] text-slate-400 hover:text-slate-200 transition-colors">🔌 เปลี่ยนมิเตอร์ / เริ่มนับใหม่ (จาก 0)</span>
+                          </label>
                         </div>
                         <div>
-                          <label className="text-xxs text-slate-400 block mb-1">💧 เลขน้ำปัจจุบัน (m³)</label>
+                          <label className="text-xxs text-slate-400 block mb-1">
+                            💧 เลขน้ำปัจจุบัน (m³) <span className="text-brand-400 font-light block mt-0.5">(เว้นว่าง = ยังไม่จด/เป็น 0)</span>
+                          </label>
                           <input
                             id="utility-curr-water"
                             type="number"
-                            required
-                            placeholder={`>= ${selectedRoomForBill.waterMeter}`}
+                            placeholder="ปล่อยว่าง = 0 หน่วย"
                             value={inputCurrWater}
                             onChange={(e) => setInputCurrWater(e.target.value === '' ? '' : Number(e.target.value))}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-brand-500 text-white"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-white"
                           />
+                          <label className="flex items-center gap-1.5 mt-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isWaterMeterReset}
+                              onChange={(e) => setIsWaterMeterReset(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded bg-slate-900 border-slate-800 text-brand-500 focus:ring-0 cursor-pointer"
+                            />
+                            <span className="text-[10px] text-slate-400 hover:text-slate-200 transition-colors">💧 เปลี่ยนมิเตอร์ / เริ่มนับใหม่ (จาก 0)</span>
+                          </label>
                         </div>
                       </div>
                     </motion.div>
@@ -1896,7 +2049,11 @@ export default function AdminDashboard({
                             {utilityBillPreview.elecUnits} <span className="text-xs font-normal text-slate-400">หน่วย</span>
                           </div>
                           <span className="text-xxs text-slate-500 block mt-1">
-                            {selectedRoomForBill?.electricityMeter} ถึง {inputCurrElectricity} kWh
+                            {isElectricityMeterReset ? (
+                              `มิเตอร์นับใหม่: 0 ถึง ${inputCurrElectricity !== '' ? inputCurrElectricity : 0} kWh`
+                            ) : (
+                              `${selectedRoomForBill?.electricityMeter} ถึง ${inputCurrElectricity !== '' ? `${inputCurrElectricity} kWh` : `${selectedRoomForBill?.electricityMeter} kWh (ยังไม่จด)`}`
+                            )}
                           </span>
                         </div>
                         <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800/60">
@@ -1907,7 +2064,11 @@ export default function AdminDashboard({
                             {utilityBillPreview.watUnits} <span className="text-xs font-normal text-slate-400">หน่วย</span>
                           </div>
                           <span className="text-xxs text-slate-500 block mt-1">
-                            {selectedRoomForBill?.waterMeter} ถึง {inputCurrWater} m³
+                            {isWaterMeterReset ? (
+                              `มิเตอร์นับใหม่: 0 ถึง ${inputCurrWater !== '' ? inputCurrWater : 0} m³`
+                            ) : (
+                              `${selectedRoomForBill?.waterMeter} ถึง ${inputCurrWater !== '' ? `${inputCurrWater} m³` : `${selectedRoomForBill?.waterMeter} m³ (ยังไม่จด)`}`
+                            )}
                           </span>
                         </div>
                       </div>
@@ -1953,67 +2114,120 @@ export default function AdminDashboard({
                 <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6">
                   <h4 className="text-base font-bold text-white mb-4">📝 ประวัติใบแจ้งหนี้ทั้งหมด</h4>
                   <div className="space-y-3.5">
-                    {invoices.map((inv) => (
-                      <div key={inv.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex justify-between items-center">
-                        <div className="text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-white">ห้อง {inv.roomNumber}</span>
-                            <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-400">{inv.billingMonth}</span>
-                          </div>
-                          <div className="text-slate-400 mt-2 space-y-0.5">
-                            <p>🔌 ไฟฟ้า: ฿{inv.electricityCost} ({inv.currElectricity - inv.prevElectricity} หน่วย)</p>
-                            <p>💧 น้ำประปา: ฿{inv.waterCost} ({inv.currWater - inv.prevWater} หน่วย)</p>
-                          </div>
-                        </div>
+                    {invoices.map((inv) => {
+                      const bookingForInv = bookings.find(b => b.roomNumber === inv.roomNumber && b.status === 'Active');
+                      const lineShareText = `📝 [${settings.propertyName || 'DORMYHUB'} - ใบแจ้งหนี้ค่าน้ำค่าไฟ]
+ห้องพัก: Room ${inv.roomNumber}
+ประจำงวด: ${inv.billingMonth}
+──────────────────────────
+🔌 ค่าไฟฟ้า: ${inv.currElectricity - inv.prevElectricity} หน่วย (* ${inv.electricityUnitRate} บ.) = ฿${inv.electricityCost.toLocaleString()} บาท
+💧 ค่าน้ำประปา: ${inv.currWater - inv.prevWater} หน่วย (* ${inv.waterUnitRate} บ.) = ฿${inv.waterCost.toLocaleString()} บาท
+🏢 ส่วนกลาง: ฿${inv.commonFee.toLocaleString()} บาท
+💰 ยอดสุทธิ: ฿${inv.totalCost.toLocaleString()} บาท
+──────────────────────────
+⏳ สถานะ: รอการชำระเงิน
+🔗 ตรวจสอบบิล & ส่งสลิปโอนเงินได้ที่: ${window.location.origin}
+ขอบคุณครับ 🙏✨`;
 
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <span className="text-base font-bold text-white block">฿{inv.totalCost.toLocaleString()}</span>
-                            <span className={`inline-block text-xxs px-2 py-0.5 mt-1 rounded-full font-semibold ${
-                              inv.status === 'Paid' 
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            }`}>
-                              {inv.status === 'Paid' ? 'ชำระแล้ว' : 'ค้างชำระ'}
-                            </span>
-                          </div>
+                      const handleCopyText = () => {
+                        navigator.clipboard.writeText(lineShareText);
+                        alert(`คัดลอกรายละเอียดบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว! สามารถนำไปวางส่ง LINE ให้ผู้เช่าได้เลยครับ`);
+                      };
 
-                          <div className="shrink-0 flex items-center justify-end">
-                            {deleteConfirmInvoiceId === inv.id ? (
-                              <div className="flex items-center gap-1.5 bg-rose-500/5 border border-rose-500/25 p-1 rounded-xl animate-pulse">
-                                <span className="text-[10px] text-rose-400 font-medium px-1">ลบ?</span>
-                                <button
-                                  id={`btn-confirm-delete-inv-${inv.id}`}
-                                  onClick={() => {
-                                    onUpdateInvoices(invoices.filter((item) => item.id !== inv.id));
-                                    setDeleteConfirmInvoiceId(null);
-                                  }}
-                                  className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-all shadow-md shadow-rose-600/25 cursor-pointer"
-                                >
-                                  ยืนยัน
-                                </button>
-                                <button
-                                  id={`btn-cancel-delete-inv-${inv.id}`}
-                                  onClick={() => setDeleteConfirmInvoiceId(null)}
-                                  className="p-1 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-md transition-colors cursor-pointer"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
+                      return (
+                        <div key={inv.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="text-xs space-y-2 w-full md:w-auto">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-white">ห้อง {inv.roomNumber}</span>
+                              <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-400">{inv.billingMonth}</span>
+                            </div>
+                            <div className="text-slate-400 space-y-0.5">
+                              <p>🔌 ไฟฟ้า: ฿{inv.electricityCost} ({inv.currElectricity - inv.prevElectricity} หน่วย)</p>
+                              <p>💧 น้ำประปา: ฿{inv.waterCost} ({inv.currWater - inv.prevWater} หน่วย)</p>
+                            </div>
+                            {bookingForInv && (
+                              <div className="pt-1.5 border-t border-slate-800/60 flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] text-slate-500">👤 {bookingForInv.guestName}</span>
+                                {bookingForInv.guestLine && (
+                                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 font-mono flex items-center gap-1">
+                                    💬 LINE: {bookingForInv.guestLine}
+                                  </span>
+                                )}
                               </div>
-                            ) : (
-                              <button
-                                id={`btn-trigger-delete-inv-${inv.id}`}
-                                onClick={() => setDeleteConfirmInvoiceId(inv.id)}
-                                className="p-2 bg-slate-900 border border-slate-800/80 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-                                title="ลบใบแจ้งหนี้"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
                             )}
                           </div>
+
+                          <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto border-t md:border-t-0 border-slate-800/60 pt-3 md:pt-0">
+                            <div className="text-left md:text-right">
+                              <span className="text-base font-bold text-white block">฿{inv.totalCost.toLocaleString()}</span>
+                              <span className={`inline-block text-xxs px-2 py-0.5 mt-1 rounded-full font-semibold ${
+                                inv.status === 'Paid' 
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              }`}>
+                                {inv.status === 'Paid' ? 'ชำระแล้ว' : 'ค้างชำระ'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {/* Copy Button */}
+                              <button
+                                onClick={handleCopyText}
+                                title="คัดลอกข้อความบิล"
+                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                📋 ก๊อปปี้บิล
+                              </button>
+
+                              {/* Send LINE Button */}
+                              <a
+                                href={`https://line.me/R/msg/text/?${encodeURIComponent(lineShareText)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="ส่งค่าน้ำค่าไฟไป LINE"
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                              >
+                                💬 ส่ง LINE
+                              </a>
+
+                              <div className="shrink-0 flex items-center justify-end ml-1">
+                                {deleteConfirmInvoiceId === inv.id ? (
+                                  <div className="flex items-center gap-1.5 bg-rose-500/5 border border-rose-500/25 p-1 rounded-xl animate-pulse">
+                                    <span className="text-[10px] text-rose-400 font-medium px-1">ลบ?</span>
+                                    <button
+                                      id={`btn-confirm-delete-inv-${inv.id}`}
+                                      onClick={() => {
+                                        onUpdateInvoices(invoices.filter((item) => item.id !== inv.id));
+                                        setDeleteConfirmInvoiceId(null);
+                                      }}
+                                      className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-all shadow-md shadow-rose-600/25 cursor-pointer"
+                                    >
+                                      ยืนยัน
+                                    </button>
+                                    <button
+                                      id={`btn-cancel-delete-inv-${inv.id}`}
+                                      onClick={() => setDeleteConfirmInvoiceId(null)}
+                                      className="p-1 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-md transition-colors cursor-pointer"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    id={`btn-trigger-delete-inv-${inv.id}`}
+                                    onClick={() => setDeleteConfirmInvoiceId(inv.id)}
+                                    className="p-2 bg-slate-900 border border-slate-800/80 rounded-xl hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                                    title="ลบใบแจ้งหนี้"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -2561,6 +2775,273 @@ export default function AdminDashboard({
             </div>
           </motion.div>
         )}
+
+        {/* TAB: MAINTENANCE MANAGEMENT */}
+        {activeTab === 'maintenance' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tight">🔧 จัดการรายการแจ้งซ่อมและร้องเรียน</h1>
+                <p className="text-slate-400 text-sm mt-1">รับเรื่องร้องเรียน ตรวจสอบภาพถ่ายประสานงาน และตอบกลับสถานะผู้เช่าพร้อมส่งอัปเดตไป LINE API</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold text-xs px-3 py-1.5 rounded-xl">
+                  เรื่องรอแก้ไข {tickets.filter(t => t.status !== 'Resolved').length} รายการ
+                </span>
+              </div>
+            </div>
+
+            {/* Tickets Table / List Layout */}
+            {tickets.length === 0 ? (
+              <div className="bg-[#121216]/90 p-12 rounded-3xl border border-white/10 text-center text-slate-500">
+                <Wrench className="w-12 h-12 mx-auto text-slate-700 mb-3 animate-pulse" />
+                <h3 className="text-base font-bold text-slate-300">ยังไม่มีรายงานการแจ้งเรื่องชำรุด</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto font-light">เมื่อผู้พักอาศัยแจ้งเรื่องผ่านทางหน้าระบบ แชทจะขึ้นที่นี่โดยอัตโนมัติพร้อมส่งแจ้งเตือนบอท LINE</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                {/* Left side: List of active and past tickets */}
+                <div className="xl:col-span-2 space-y-4">
+                  <div className="bg-[#121216]/90 rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
+                    <div className="px-6 py-5 border-b border-white/10 bg-[#0a0a0c]/60 flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>📋 รายการร้องเรียนทั้งหมด ({tickets.length} เรื่อง)</span>
+                      </h3>
+                    </div>
+
+                    <div className="divide-y divide-white/5 max-h-[70vh] overflow-y-auto">
+                      {tickets.slice().reverse().map((tc) => {
+                        return (
+                          <div
+                            key={tc.id}
+                            className="p-6 hover:bg-white/[0.02] transition-colors flex flex-col md:flex-row md:items-start justify-between gap-4"
+                          >
+                            <div className="space-y-3 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="bg-slate-800 text-white font-extrabold text-xs px-2.5 py-1 rounded-lg border border-slate-700">
+                                  ห้อง {tc.roomNumber}
+                                </span>
+                                <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
+                                  tc.urgency === 'high' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                  tc.urgency === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                  'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                }`}>
+                                  {tc.urgency === 'high' ? '🔴 ด่วนมาก' : tc.urgency === 'medium' ? '🟡 ปานกลาง' : '🟢 ต่ำ'}
+                                </span>
+                                <span className="text-xxs text-slate-500 font-mono">
+                                  ID: {tc.id} | วันที่แจ้ง: {new Date(tc.createdAt).toLocaleDateString('th-TH')} {new Date(tc.createdAt).toLocaleTimeString('th-TH')}
+                                </span>
+                              </div>
+
+                              <div>
+                                <h4 className="text-sm font-bold text-slate-200 uppercase tracking-wide flex items-center gap-2">
+                                  <span>หมวดหมู่: {
+                                    tc.category === 'aircon' ? '💨 เครื่องปรับอากาศ' :
+                                    tc.category === 'plumbing' ? '💧 ท่อน้ำ/สุขภัณฑ์' :
+                                    tc.category === 'electricity' ? '🔌 อุปกรณ์ไฟฟ้า' :
+                                    tc.category === 'furniture' ? '🪑 เฟอร์นิเจอร์' : '📦 ทั่วไป/อื่นๆ'
+                                  }</span>
+                                </h4>
+                                <p className="text-slate-400 text-xs font-light mt-1.5 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-white/5">
+                                  {tc.description}
+                                </p>
+                              </div>
+
+                              {tc.photo && (
+                                <div className="mt-2">
+                                  <a
+                                    href={tc.photo}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-brand-400 hover:text-brand-300 text-xxs font-medium"
+                                  >
+                                    <ImageIcon className="w-3.5 h-3.5" />
+                                    <span>คลิกเพื่อดูรูปภาพแนบของผู้พักอาศัย 📸</span>
+                                  </a>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-4 text-xxs text-slate-500 pt-1">
+                                <div>👤 ชื่อผู้แจ้ง: <span className="text-slate-300 font-semibold">{tc.guestName}</span></div>
+                                <div>📞 เบอร์ติดต่อ: <span className="text-slate-300 font-semibold font-mono">{tc.guestPhone}</span></div>
+                              </div>
+
+                              {tc.adminNotes && (
+                                <div className="bg-[#121216] border border-white/10 rounded-xl p-3 text-xxs text-left">
+                                  <span className="font-extrabold text-amber-400 block mb-1">💬 โน้ตความคืบหน้าจากฝ่ายอาคาร:</span>
+                                  <p className="text-slate-300 font-light leading-relaxed">{tc.adminNotes}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Ticket Action states */}
+                            <div className="shrink-0 flex flex-col items-start md:items-end gap-3 justify-between">
+                              <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border uppercase tracking-wider ${
+                                tc.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                tc.status === 'In Progress' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              }`}>
+                                {tc.status === 'Resolved' ? '🟢 ซ่อมแซมเสร็จสิ้น' :
+                                 tc.status === 'In Progress' ? '🔵 กำลังดำเนินการ' :
+                                 '⏳ รอเข้าดำเนินการ'}
+                              </span>
+
+                              <div className="flex flex-row md:flex-col gap-1.5 w-full">
+                                {tc.status !== 'In Progress' && tc.status !== 'Resolved' && (
+                                  <button
+                                    onClick={() => handleUpdateTicketStatus(tc.id, 'In Progress', 'ได้รับเรื่องเรียบร้อย และกำลังจัดส่งทีมช่างเทคนิคอาคารเข้าตรวจสอบ')}
+                                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xxs transition-colors w-full cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    <span>รับงาน & ซ่อม ⚙️</span>
+                                  </button>
+                                )}
+                                {tc.status !== 'Resolved' && (
+                                  <button
+                                    onClick={() => {
+                                      setClosingTicketId(tc.id);
+                                      setTicketCloseNotes('ดำเนินการแก้ไขเรียบร้อยแล้ว');
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-extrabold text-xxs transition-colors w-full cursor-pointer flex items-center justify-center gap-1"
+                                  >
+                                    <span>ปิดงานแจ้งซ่อม ✅</span>
+                                  </button>
+                                )}
+                                {tc.status === 'Resolved' && (
+                                  <>
+                                    {deleteConfirmTicketId === tc.id ? (
+                                      <div className="flex items-center gap-1.5 bg-rose-500/5 border border-rose-500/25 p-1 rounded-xl animate-pulse w-full justify-center">
+                                        <span className="text-[10px] text-rose-400 font-medium px-1">ยืนยันลบ?</span>
+                                        <button
+                                          onClick={() => {
+                                            onUpdateTickets(tickets.filter(t => t.id !== tc.id));
+                                            setDeleteConfirmTicketId(null);
+                                          }}
+                                          className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-bold transition-all shadow-md shadow-rose-600/25 cursor-pointer"
+                                        >
+                                          ลบเลย
+                                        </button>
+                                        <button
+                                          onClick={() => setDeleteConfirmTicketId(null)}
+                                          className="p-1 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white rounded-md transition-colors cursor-pointer"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setDeleteConfirmTicketId(tc.id)}
+                                        className="px-3 py-1.5 rounded-lg bg-rose-950/20 hover:bg-rose-600/25 border border-rose-500/20 text-rose-400 hover:text-rose-300 font-bold text-xxs transition-all w-full cursor-pointer flex items-center justify-center gap-1"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>ลบรายการแจ้งซ่อม</span>
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right side: Instructions / Quick Simulation */}
+                <div className="space-y-6">
+                  <div className="bg-slate-900/60 p-6 rounded-3xl border border-white/5 space-y-4">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>อธิบายระบบงานซ่อมคู่กับ LINE API</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed font-light">
+                      ระบบนี้เชื่อมต่อกับ <strong>LINE Notify / LINE Messaging API</strong> ของฝ่ายจัดการอาคารโดยอัตโนมัติ:
+                    </p>
+                    <ul className="text-xxs text-slate-500 space-y-2 leading-relaxed text-left">
+                      <li className="flex items-start gap-2">
+                        <span className="text-amber-500">⚡</span>
+                        <span><strong>เมื่อผู้เช่ากดแจ้งปัญหา:</strong> บอทจะทำการส่งข้อความด่วนแจ้งเตือนเข้าแชทช่างใน LINE ทันทีพร้อมเบอร์โทร</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-emerald-500">⚙️</span>
+                        <span><strong>เมื่อแอดมินอัปเดตสถานะงาน:</strong> บอทจะทำการส่งอัปเดตตอบรับให้ผู้พักทราบเพื่อความพึงพอใจสูงสุด</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Custom Ticket Closure Modal */}
+        <AnimatePresence>
+          {closingTicketId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setClosingTicketId(null)}
+                className="absolute inset-0 bg-[#060608]/80 backdrop-blur-md"
+              />
+              {/* Content Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-md bg-slate-950 border border-white/10 rounded-3xl p-6 shadow-2xl z-10 text-left overflow-hidden"
+              >
+                {/* Premium Glow effect */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
+                  <Wrench className="w-6 h-6" />
+                </div>
+
+                <h3 className="text-lg font-bold text-white mb-2">สรุปรายงานการแจ้งซ่อม</h3>
+                <p className="text-xs text-slate-400 font-light leading-relaxed mb-4">
+                  ระบุรายละเอียดการซ่อมบำรุงหรือหมายเหตุช่าง เพื่อตอบกลับไปยังผู้เข้าพักและส่งแจ้งเตือนผ่านบอท LINE ทันที
+                </p>
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">บันทึกรายงานช่าง</label>
+                    <textarea
+                      value={ticketCloseNotes}
+                      onChange={(e) => setTicketCloseNotes(e.target.value)}
+                      placeholder="เช่น ดำเนินการเปลี่ยนอะไหล่ใหม่เรียบร้อยแล้ว..."
+                      rows={3}
+                      className="w-full bg-[#121216]/90 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setClosingTicketId(null)}
+                    className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl font-bold text-xxs text-slate-300 transition-colors cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (closingTicketId) {
+                        handleUpdateTicketStatus(closingTicketId, 'Resolved', ticketCloseNotes);
+                      }
+                      setClosingTicketId(null);
+                    }}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded-xl font-bold text-xxs shadow-lg shadow-emerald-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    เสร็จสิ้น & ปิดงาน
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
       </main>
 
