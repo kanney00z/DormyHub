@@ -20,6 +20,36 @@ const ROOM_IMAGE_PRESETS = [
   { name: 'Family Loft', url: 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80' }
 ];
 
+function safeCopyToClipboard(text: string): boolean {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    console.warn("Modern clipboard API failed, trying fallback...", e);
+  }
+
+  // Fallback to execCommand
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  let successful = false;
+  try {
+    successful = document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback clipboard copy failed', err);
+  }
+  document.body.removeChild(textArea);
+  return successful;
+}
+
 interface AdminDashboardProps {
   rooms: Room[];
   bookings: Booking[];
@@ -507,6 +537,7 @@ export default function AdminDashboard({
     onUpdateInvoices([newInvoice, ...invoices]);
 
     // LINE Notification on Invoice Created
+    let notificationStatus = '';
     if (settings.lineNotificationEnabled) {
       const elecUnits = newInvoice.currElectricity - newInvoice.prevElectricity;
       const watUnits = newInvoice.currWater - newInvoice.prevWater;
@@ -532,8 +563,22 @@ export default function AdminDashboard({
 ──────────────────────────
 💡 กรุณาชำระเงินและส่งหลักฐานผ่านหน้าระบบหอพัก
 ขอบคุณที่เลือกใช้บริการหอพักของเราครับ 🙏`;
-      sendLineNotification(settings, msg).catch(err => console.error('Failed to send invoice notification', err));
+      sendLineNotification(settings, msg)
+        .then((res) => {
+          if (res.success) {
+            console.log('LINE notification sent successfully');
+          } else {
+            console.error('Failed to send LINE notification:', res.error);
+          }
+        })
+        .catch(err => console.error('Failed to send invoice notification', err));
+      notificationStatus = '\n\n📲 ระบบส่งการแจ้งเตือนผ่านบอท LINE อัตโนมัติไปยังกลุ่มหรือแชทหลักของหอพักเรียบร้อยแล้ว!';
+    } else {
+      notificationStatus = '\n\n💡 แนะนำ: ท่านสามารถเลื่อนลงไปด้านล่างที่หัวข้อ "ประวัติใบแจ้งหนี้ทั้งหมด" เพื่อกดปุ่ม "ก๊อปปี้บิล" หรือ "ส่ง LINE" เพื่อส่งยอดค้างชำระตรงให้ผู้เช่าได้เลยครับ';
     }
+
+    // Explicit confirmation alert to solve the "nothing happened" confusion
+    alert(`🎉 ออกบิลสำเร็จ!\n\nทำรายการจัดทำใบแจ้งค่าบริการสำหรับ ห้อง ${newInvoice.roomNumber} ประจำงวด ${newInvoice.billingMonth} รวมเป็นเงินทั้งสิ้น ฿${newInvoice.totalCost.toLocaleString()} เรียบร้อยแล้ว${notificationStatus}`);
 
     // Reset fields
     setSelectedRoomIdForBill('');
@@ -2490,8 +2535,18 @@ export default function AdminDashboard({
 ขอบคุณครับ 🙏✨`;
 
                       const handleCopyText = () => {
-                        navigator.clipboard.writeText(lineShareText);
-                        alert(`คัดลอกรายละเอียดบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว! สามารถนำไปวางส่ง LINE ให้ผู้เช่าได้เลยครับ`);
+                        const copied = safeCopyToClipboard(lineShareText);
+                        if (copied) {
+                          alert(`📋 คัดลอกรายละเอียดบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว! สามารถนำไปวางส่ง LINE ให้ผู้เช่าได้เลยครับ`);
+                        } else {
+                          alert(`⚠️ ไม่สามารถคัดลอกอัตโนมัติได้เนื่องจากสิทธิ์เบราว์เซอร์ กรุณาคัดลอกด้วยตนเองครับ`);
+                        }
+                      };
+
+                      const handleSendLine = () => {
+                        safeCopyToClipboard(lineShareText);
+                        alert(`📋 ระบบทำการคัดลอกบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว!\n\nระบบกำลังเปิดแอปพลิเคชัน LINE (หรือเปิดเว็บแชร์) หากเว็บไม่สามารถเปิดแอปได้เนื่องจากสิทธิ์แซนด์บ็อกซ์ของเบราว์เซอร์ ท่านสามารถเข้าไปในแชท LINE ของผู้เช่าแล้วกด "วาง" (Ctrl+V / Paste) เพื่อส่งบิลได้ทันทีครับ`);
+                        window.open(`https://line.me/R/msg/text/?${encodeURIComponent(lineShareText)}`, '_blank');
                       };
 
                       return (
@@ -2540,15 +2595,14 @@ export default function AdminDashboard({
                               </button>
 
                               {/* Send LINE Button */}
-                              <a
-                                href={`https://line.me/R/msg/text/?${encodeURIComponent(lineShareText)}`}
-                                target="_blank"
-                                rel="noreferrer"
+                              <button
+                                type="button"
+                                onClick={handleSendLine}
                                 title="ส่งค่าน้ำค่าไฟไป LINE"
-                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border-0"
                               >
                                 💬 ส่ง LINE
-                              </a>
+                              </button>
 
                               <div className="shrink-0 flex items-center justify-end ml-1">
                                 {deleteConfirmInvoiceId === inv.id ? (
