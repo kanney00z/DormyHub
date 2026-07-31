@@ -144,6 +144,8 @@ export default function AdminDashboard({
   // LINE Notification Testing state
   const [lineTestLoading, setLineTestLoading] = useState(false);
   const [lineTestResult, setLineTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [supabaseSyncLoading, setSupabaseSyncLoading] = useState(false);
+  const [supabaseSyncResult, setSupabaseSyncResult] = useState<{ success: boolean; message: string } | null>(null);
   const [simActiveTab, setSimActiveTab] = useState<'booking' | 'invoice' | 'payment' | 'status'>('booking');
 
   // Stats Calculations
@@ -3450,10 +3452,44 @@ export default function AdminDashboard({
                     </div>
                   </div>
 
-                  <div className="bg-[#0a0a0f]/80 p-3.5 rounded-xl border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                    <div className="text-slate-400">
-                      💡 <strong className="text-white">คำแนะนำการติดตั้งใน Supabase:</strong> คัดลอกโค้ด SQL ด้านขวา แล้วไปวางที่เมนู <span className="text-emerald-400">SQL Editor</span> ใน Supabase เพื่อสร้างตารางอัตโนมัติ
-                    </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={supabaseSyncLoading}
+                      onClick={async () => {
+                        setSupabaseSyncLoading(true);
+                        setSupabaseSyncResult(null);
+                        try {
+                          const mod = await import('../lib/supabase');
+                          const res = await mod.pushAllToSupabase(
+                            { rooms, bookings, invoices, tickets, settings },
+                            settings
+                          );
+                          setSupabaseSyncResult(res);
+                        } catch (err: any) {
+                          setSupabaseSyncResult({
+                            success: false,
+                            message: err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase',
+                          });
+                        } finally {
+                          setSupabaseSyncLoading(false);
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {supabaseSyncLoading ? (
+                        <>
+                          <RotateCw className="w-4 h-4 animate-spin" />
+                          กำลังซิงค์ข้อมูลขึ้น Supabase...
+                        </>
+                      ) : (
+                        <>
+                          <Database className="w-4 h-4" />
+                          🚀 พุช/ส่งข้อมูลทั้งหมดขึ้น Supabase ทันที
+                        </>
+                      )}
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
@@ -3462,12 +3498,28 @@ export default function AdminDashboard({
                           alert('คัดลอก SQL คำสั่งสร้างตารางเรียบร้อยแล้ว! นำไปรันใน SQL Editor บน Supabase ได้เลยครับ');
                         });
                       }}
-                      className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 text-xs"
+                      className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold transition-all shrink-0 cursor-pointer flex items-center justify-center gap-1.5 text-xs"
                     >
                       📋 คัดลอก SQL Setup
                     </button>
                   </div>
+
+                  {supabaseSyncResult && (
+                    <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2 ${
+                      supabaseSyncResult.success 
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                        : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    }`}>
+                      {supabaseSyncResult.success ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />}
+                      <span className="whitespace-pre-line leading-relaxed">{supabaseSyncResult.message}</span>
+                    </div>
+                  )}
+
+                  <div className="bg-[#0a0a0f]/80 p-3.5 rounded-xl border border-white/5 text-xs text-slate-400">
+                    💡 <strong className="text-white">คำแนะนำการติดตั้งใน Supabase:</strong> คัดลอกโค้ด SQL จากปุ่มด้านบน แล้วนำไปวางในเมนู <span className="text-emerald-400 font-semibold">SQL Editor</span> บน Supabase แล้วกด <span className="text-white font-semibold">Run</span> เพื่อสร้างตาราง <code className="text-emerald-300 font-mono">dormy_state</code>
+                  </div>
                 </div>
+
 
               </div>
 

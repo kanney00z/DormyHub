@@ -13,10 +13,13 @@ export async function fetchServerDb(): Promise<ServerDbState | null> {
   try {
     const res = await fetch('/api/db');
     if (!res.ok) return null;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return null;
+    }
     const data = await res.json();
     return data;
-  } catch (err) {
-    console.error('Failed to fetch server DB:', err);
+  } catch {
     return null;
   }
 }
@@ -29,8 +32,7 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<boo
       body: JSON.stringify(payload),
     });
     return res.ok;
-  } catch (err) {
-    console.error('Failed to save server DB:', err);
+  } catch {
     return false;
   }
 }
@@ -43,8 +45,7 @@ export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Pro
       body: JSON.stringify({ booking, rooms }),
     });
     return res.ok;
-  } catch (err) {
-    console.error('Failed to sync booking to server DB:', err);
+  } catch {
     return false;
   }
 }

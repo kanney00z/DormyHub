@@ -109,3 +109,65 @@ export async function saveSupabaseState(
     console.error(`Error saving ${key} to Supabase:`, err);
   }
 }
+
+export async function pushAllToSupabase(
+  allState: {
+    rooms?: Room[];
+    bookings?: Booking[];
+    invoices?: UtilityInvoice[];
+    tickets?: MaintenanceTicket[];
+    settings?: SystemSettings;
+  },
+  settings: SystemSettings
+): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
+  if (!client) {
+    return {
+      success: false,
+      message: 'ยังไม่ได้ใส่ Supabase Project URL หรือ Anon Key กรุณาระบุในช่องด้านบน',
+    };
+  }
+
+  try {
+    const keys: Array<'rooms' | 'bookings' | 'invoices' | 'tickets' | 'settings'> = [
+      'rooms',
+      'bookings',
+      'invoices',
+      'tickets',
+      'settings',
+    ];
+
+    for (const k of keys) {
+      if (allState[k] !== undefined) {
+        const { error } = await client.from('dormy_state').upsert(
+          {
+            id: k,
+            data: allState[k],
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+        if (error) {
+          throw new Error(`Error uploading ${k}: ${error.message}`);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: 'เชื่อมต่อและซิงค์ข้อมูลขึ้น Supabase สำเร็จเรียบร้อยแล้ว!',
+    };
+  } catch (err: any) {
+    console.error('Push to Supabase error:', err);
+    let msg = err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase';
+    if (msg.includes('exceed_egress_quota') || msg.includes('restricted due to the following violations')) {
+      msg = '⚠️ โปรเจกต์ Supabase ของคุณถูกระงับชั่วคราวเนื่องจากใช้งานเกินโควต้าฟรี (exceed_egress_quota) บน Supabase Console\n\n✅ แต่ไม่ต้องกังวล! ระบบได้ใช้ Express Server DB (แชร์ฐานข้อมูลภายในแอป) ในการเซฟและซิงค์ข้อมูลการจองและห้องพักข้ามเครื่องอัตโนมัติให้อยู่แล้วครับ';
+    }
+    return {
+      success: false,
+      message: msg,
+    };
+  }
+}
+
+
