@@ -111,6 +111,33 @@ export default function AdminDashboard({
   const [filterHistoryRoomId, setFilterHistoryRoomId] = useState<string>('All');
 
   // UPGRADE 1, 2 & 3: Filter, Search, and Viewer states
+  const [notifyModal, setNotifyModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    recommendation?: string;
+    icon?: string;
+    type?: 'success' | 'info' | 'warning';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    recommendation: '',
+    icon: '🎉',
+    type: 'success',
+  });
+
+  const showNotifyModal = (title: string, message: string, recommendation?: string, icon = '🎉', type: 'success' | 'info' | 'warning' = 'success') => {
+    setNotifyModal({
+      isOpen: true,
+      title,
+      message,
+      recommendation,
+      icon,
+      type,
+    });
+  };
+
   const [chartTab, setChartTab] = useState<'revenue' | 'utility'>('revenue');
   const [roomSearchText, setRoomSearchText] = useState('');
   const [roomStatusFilter, setRoomStatusFilter] = useState<'All' | 'Available' | 'Occupied' | 'Maintenance'>('All');
@@ -606,13 +633,18 @@ export default function AdminDashboard({
           }
         })
         .catch(err => console.error('Failed to send invoice notification', err));
-      notificationStatus = '\n\n📲 ระบบส่งการแจ้งเตือนผ่านบอท LINE อัตโนมัติไปยังกลุ่มหรือแชทหลักของหอพักเรียบร้อยแล้ว!';
+      notificationStatus = '📲 ระบบส่งการแจ้งเตือนผ่านบอท LINE อัตโนมัติไปยังกลุ่มหรือแชทหลักของหอพักเรียบร้อยแล้ว!';
     } else {
-      notificationStatus = '\n\n💡 แนะนำ: ท่านสามารถเลื่อนลงไปด้านล่างที่หัวข้อ "ประวัติใบแจ้งหนี้ทั้งหมด" เพื่อกดปุ่ม "ก๊อปปี้บิล" หรือ "ส่ง LINE" เพื่อส่งยอดค้างชำระตรงให้ผู้เช่าได้เลยครับ';
+      notificationStatus = 'ท่านสามารถเลื่อนลงไปด้านล่างที่หัวข้อ "ประวัติใบแจ้งหนี้ทั้งหมด" เพื่อกดปุ่ม "ก๊อปปี้บิล" หรือ "ส่ง LINE" เพื่อส่งยอดค้างชำระตรงให้ผู้เช่าได้เลยครับ';
     }
 
-    // Explicit confirmation alert to solve the "nothing happened" confusion
-    alert(`🎉 ออกบิลสำเร็จ!\n\nทำรายการจัดทำใบแจ้งค่าบริการสำหรับ ห้อง ${newInvoice.roomNumber} ประจำงวด ${newInvoice.billingMonth} รวมเป็นเงินทั้งสิ้น ฿${newInvoice.totalCost.toLocaleString()} เรียบร้อยแล้ว${notificationStatus}`);
+    showNotifyModal(
+      'ออกบิลสำเร็จ!',
+      `ทำรายการจัดทำใบแจ้งค่าบริการสำหรับ ห้อง ${newInvoice.roomNumber} ประจำงวด ${newInvoice.billingMonth} รวมเป็นเงินทั้งสิ้น ฿${newInvoice.totalCost.toLocaleString()} เรียบร้อยแล้ว`,
+      notificationStatus,
+      '🎉',
+      'success'
+    );
 
     // Reset fields
     setSelectedRoomIdForBill('');
@@ -2804,15 +2836,33 @@ export default function AdminDashboard({
                       const handleCopyText = () => {
                         const copied = safeCopyToClipboard(lineShareText);
                         if (copied) {
-                          alert(`📋 คัดลอกรายละเอียดบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว! สามารถนำไปวางส่ง LINE ให้ผู้เช่าได้เลยครับ`);
+                          showNotifyModal(
+                            'คัดลอกรายละเอียดบิลสำเร็จ!',
+                            `ระบบทำการคัดลอกรายละเอียดบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว`,
+                            'สามารถนำไปวางส่ง LINE ให้ผู้เช่าได้เลยครับ',
+                            '📋',
+                            'info'
+                          );
                         } else {
-                          alert(`⚠️ ไม่สามารถคัดลอกอัตโนมัติได้เนื่องจากสิทธิ์เบราว์เซอร์ กรุณาคัดลอกด้วยตนเองครับ`);
+                          showNotifyModal(
+                            'คัดลอกไม่สำเร็จ',
+                            'ไม่สามารถคัดลอกอัตโนมัติได้เนื่องจากสิทธิ์เบราว์เซอร์ กรุณาคัดลอกด้วยตนเองครับ',
+                            '',
+                            '⚠️',
+                            'warning'
+                          );
                         }
                       };
 
                       const handleSendLine = () => {
                         safeCopyToClipboard(lineShareText);
-                        alert(`📋 ระบบทำการคัดลอกบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว!\n\nระบบกำลังเปิดแอปพลิเคชัน LINE (หรือเปิดเว็บแชร์) หากเว็บไม่สามารถเปิดแอปได้เนื่องจากสิทธิ์แซนด์บ็อกซ์ของเบราว์เซอร์ ท่านสามารถเข้าไปในแชท LINE ของผู้เช่าแล้วกด "วาง" (Ctrl+V / Paste) เพื่อส่งบิลได้ทันทีครับ`);
+                        showNotifyModal(
+                          'คัดลอกบิลเรียบร้อยแล้ว!',
+                          `ระบบทำการคัดลอกบิลห้อง ${inv.roomNumber} เรียบร้อยแล้ว และกำลังเปิดแอปพลิเคชัน LINE`,
+                          'หากเว็บไม่สามารถเปิดแอปได้เนื่องจากสิทธิ์แซนด์บ็อกซ์ของเบราว์เซอร์ ท่านสามารถเข้าไปในแชท LINE ของผู้เช่าแล้วกด "วาง" (Ctrl+V / Paste) เพื่อส่งบิลได้ทันทีครับ',
+                          '📋',
+                          'info'
+                        );
                         window.open(`https://line.me/R/msg/text/?${encodeURIComponent(lineShareText)}`, '_blank');
                       };
 
@@ -3494,8 +3544,14 @@ export default function AdminDashboard({
                       type="button"
                       onClick={() => {
                         import('../lib/supabase').then((mod) => {
-                          navigator.clipboard.writeText(mod.SUPABASE_SQL_SETUP);
-                          alert('คัดลอก SQL คำสั่งสร้างตารางเรียบร้อยแล้ว! นำไปรันใน SQL Editor บน Supabase ได้เลยครับ');
+                          safeCopyToClipboard(mod.SUPABASE_SQL_SETUP);
+                          showNotifyModal(
+                            'คัดลอก SQL Setup สำเร็จ!',
+                            'คัดลอก SQL คำสั่งสร้างตารางเรียบร้อยแล้ว',
+                            'นำไปรันใน SQL Editor บน Supabase เพื่อสร้างตาราง dormy_state ได้เลยครับ',
+                            '📋',
+                            'success'
+                          );
                         });
                       }}
                       className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold transition-all shrink-0 cursor-pointer flex items-center justify-center gap-1.5 text-xs"
@@ -4509,6 +4565,62 @@ export default function AdminDashboard({
                       ปิดหน้าจอตรวจสอบ
                     </button>
                   </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Modern Notification Modal */}
+        <AnimatePresence>
+          {notifyModal.isOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden"
+              >
+                {/* Glow Accent Background */}
+                <div className={`absolute -top-16 -right-16 w-36 h-36 rounded-full blur-3xl pointer-events-none ${
+                  notifyModal.type === 'warning' ? 'bg-amber-500/20' : notifyModal.type === 'info' ? 'bg-blue-500/20' : 'bg-emerald-500/20'
+                }`} />
+
+                <div className="flex items-start gap-4 relative z-10">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 border shadow-inner ${
+                    notifyModal.type === 'warning' 
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' 
+                      : notifyModal.type === 'info' 
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  }`}>
+                    {notifyModal.icon || '🎉'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-white mb-2 leading-tight flex items-center gap-2">
+                      {notifyModal.title}
+                    </h3>
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                      {notifyModal.message}
+                    </p>
+                    
+                    {notifyModal.recommendation && (
+                      <div className="mt-4 p-3.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-xs text-amber-300/90 leading-relaxed flex items-start gap-2.5 shadow-inner">
+                        <span className="shrink-0 text-base">💡</span>
+                        <span className="font-normal">{notifyModal.recommendation}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end relative z-10">
+                  <button
+                    type="button"
+                    onClick={() => setNotifyModal(prev => ({ ...prev, isOpen: false }))}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm rounded-xl transition-all shadow-lg shadow-emerald-500/20 cursor-pointer active:scale-95"
+                  >
+                    ตกลง (OK)
+                  </button>
                 </div>
               </motion.div>
             </div>
