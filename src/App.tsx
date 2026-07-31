@@ -9,6 +9,7 @@ import CustomerView from './components/CustomerView';
 import AdminDashboard from './components/AdminDashboard';
 import { sendLineNotification } from './utils/line';
 import { fetchSupabaseData, saveSupabaseState, getSupabaseClient } from './lib/supabase';
+import { fetchServerDb, saveServerDb, syncBookingServerDb } from './lib/serverDb';
 
 export default function App() {
   const [role, setRole] = useState<'guest' | 'admin'>('guest');
@@ -55,10 +56,37 @@ export default function App() {
   });
 
   const isRemoteSyncRef = useRef(false);
+  const lastUpdatedRef = useRef<number>(0);
 
-  // Initial Sync from Supabase on mount or when Supabase credentials change
+  // Sync with built-in Server DB and Supabase on mount and poll every 3 seconds for live updates
   useEffect(() => {
     let isMounted = true;
+
+    async function syncWithServerDb() {
+      const db = await fetchServerDb();
+      if (db && isMounted) {
+        if (!lastUpdatedRef.current || (db.lastUpdated && db.lastUpdated > lastUpdatedRef.current)) {
+          lastUpdatedRef.current = db.lastUpdated || Date.now();
+          isRemoteSyncRef.current = true;
+          if (db.rooms) setRooms(db.rooms);
+          if (db.bookings) setBookings(db.bookings);
+          if (db.invoices) setInvoices(db.invoices);
+          if (db.tickets) setTickets(db.tickets);
+          if (db.settings) setSettings(prev => ({ ...prev, ...db.settings }));
+          setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+        }
+      }
+    }
+
+    // Initial fetch from server DB
+    syncWithServerDb();
+
+    // Poll server DB every 3 seconds so any new booking/update from another device instantly appears
+    const pollInterval = setInterval(() => {
+      syncWithServerDb();
+    }, 3000);
+
+    // Initial Sync from Supabase if credentials are configured
     async function loadFromSupabase() {
       const data = await fetchSupabaseData(settings);
       if (data && isMounted) {
@@ -73,10 +101,11 @@ export default function App() {
     }
     loadFromSupabase();
 
-    // Setup Realtime subscription
+    // Setup Supabase Realtime subscription if available
     const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
+    let channel: any = null;
     if (client) {
-      const channel = client
+      channel = client
         .channel('dormy_state_changes')
         .on(
           'postgres_changes',
@@ -95,18 +124,22 @@ export default function App() {
           }
         )
         .subscribe();
-
-      return () => {
-        isMounted = false;
-        client.removeChannel(channel);
-      };
     }
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+      if (client && channel) {
+        client.removeChannel(channel);
+      }
+    };
   }, [settings.supabaseUrl, settings.supabaseAnonKey]);
 
-  // Save states automatically on changes to localStorage AND Supabase
+  // Save states automatically on changes to localStorage, Express Server DB AND Supabase
   useEffect(() => {
     localStorage.setItem('dormy_v5_rooms', JSON.stringify(rooms));
     if (!isRemoteSyncRef.current) {
+      saveServerDb({ rooms });
       saveSupabaseState('rooms', rooms, settings);
     }
   }, [rooms, settings]);
@@ -114,6 +147,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('dormy_v5_bookings', JSON.stringify(bookings));
     if (!isRemoteSyncRef.current) {
+      saveServerDb({ bookings });
       saveSupabaseState('bookings', bookings, settings);
     }
   }, [bookings, settings]);
@@ -121,6 +155,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('dormy_v5_invoices', JSON.stringify(invoices));
     if (!isRemoteSyncRef.current) {
+      saveServerDb({ invoices });
       saveSupabaseState('invoices', invoices, settings);
     }
   }, [invoices, settings]);
@@ -128,6 +163,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('dormy_v5_tickets', JSON.stringify(tickets));
     if (!isRemoteSyncRef.current) {
+      saveServerDb({ tickets });
       saveSupabaseState('tickets', tickets, settings);
     }
   }, [tickets, settings]);
@@ -135,13 +171,13 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
     if (!isRemoteSyncRef.current) {
+      saveServerDb({ settings });
       saveSupabaseState('settings', settings, settings);
     }
   }, [settings]);
 
-
   // Handle addition of a booking (can be from customer or admin)
-  const handleAddBooking = (newBookingData: Omit<Booking, 'id' | 'createdAt'>) => {
+  const handleAddBooking = async (newBookingData: Omit<Booking, 'id' | 'createdAt'>) => {
     const newBooking: Booking = {
       ...newBookingData,
       id: 'BK-' + Math.floor(100000 + Math.random() * 900000),
@@ -150,6 +186,9 @@ export default function App() {
     
     // Append booking
     setBookings(prev => [newBooking, ...prev]);
+
+    // Push immediately to server DB
+    await syncBookingServerDb(newBooking, rooms);
 
     // Send LINE Notification
     if (settings.lineNotificationEnabled) {

@@ -1,0 +1,50 @@
+import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from '../types';
+
+export interface ServerDbState {
+  rooms: Room[];
+  bookings: Booking[];
+  invoices: UtilityInvoice[];
+  tickets: MaintenanceTicket[];
+  settings: SystemSettings;
+  lastUpdated?: number;
+}
+
+export async function fetchServerDb(): Promise<ServerDbState | null> {
+  try {
+    const res = await fetch('/api/db');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.error('Failed to fetch server DB:', err);
+    return null;
+  }
+}
+
+export async function saveServerDb(payload: Partial<ServerDbState>): Promise<boolean> {
+  try {
+    const res = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to save server DB:', err);
+    return false;
+  }
+}
+
+export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Promise<boolean> {
+  try {
+    const res = await fetch('/api/db/booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ booking, rooms }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to sync booking to server DB:', err);
+    return false;
+  }
+}

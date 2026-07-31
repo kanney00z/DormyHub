@@ -2,12 +2,60 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
+import { INITIAL_ROOMS, INITIAL_BOOKINGS, INITIAL_INVOICES, INITIAL_TICKETS, DEFAULT_SETTINGS } from "./src/data.ts";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "20mb" }));
+
+  // Ensure data directory exists for persistent DB storage
+  const dataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const dbFilePath = path.join(dataDir, "db.json");
+
+  // Helper to load DB state
+  function getDbState() {
+    try {
+      if (fs.existsSync(dbFilePath)) {
+        const raw = fs.readFileSync(dbFilePath, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (err) {
+      console.error("Error reading db.json, resetting to initial state:", err);
+    }
+    const initState = {
+      rooms: INITIAL_ROOMS,
+      bookings: INITIAL_BOOKINGS,
+      invoices: INITIAL_INVOICES,
+      tickets: INITIAL_TICKETS,
+      settings: DEFAULT_SETTINGS,
+      lastUpdated: Date.now(),
+    };
+    try {
+      fs.writeFileSync(dbFilePath, JSON.stringify(initState, null, 2), "utf-8");
+    } catch (e) {}
+    return initState;
+  }
+
+  // Helper to save DB state
+  function saveDbState(state: any) {
+    try {
+      state.lastUpdated = Date.now();
+      fs.writeFileSync(dbFilePath, JSON.stringify(state, null, 2), "utf-8");
+      return state.lastUpdated;
+    } catch (err) {
+      console.error("Error saving db.json:", err);
+      return Date.now();
+    }
+  }
+
+  // Ensure DB initialized on server boot
+  getDbState();
 
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const startTime = Date.now();
@@ -19,6 +67,67 @@ async function startServer() {
       } catch (e) {}
     });
     next();
+  });
+
+  // GET /api/db - Returns shared server state for multi-device sync
+  app.get("/api/db", (req: express.Request, res: express.Response) => {
+    const state = getDbState();
+    return res.json(state);
+  });
+
+  // POST /api/db - Saves complete or partial shared state
+  app.post("/api/db", (req: express.Request, res: express.Response) => {
+    try {
+      const current = getDbState();
+      const { rooms, bookings, invoices, tickets, settings } = req.body;
+
+      const updatedState = {
+        rooms: rooms || current.rooms,
+        bookings: bookings || current.bookings,
+        invoices: invoices || current.invoices,
+        tickets: tickets || current.tickets,
+        settings: settings || current.settings,
+        lastUpdated: Date.now(),
+      };
+
+      const lastUpdated = saveDbState(updatedState);
+      return res.json({ success: true, lastUpdated, state: updatedState });
+    } catch (err: any) {
+      console.error("Error syncing DB state:", err);
+      return res.status(500).json({ error: err.message || "Failed to update DB" });
+    }
+  });
+
+  // POST /api/db/booking - Atomically add or update a booking and sync across all connected clients
+  app.post("/api/db/booking", (req: express.Request, res: express.Response) => {
+    try {
+      const current = getDbState();
+      const newBooking = req.body.booking;
+      const updatedRooms = req.body.rooms;
+
+      if (!newBooking) {
+        return res.status(400).json({ error: "Booking object required" });
+      }
+
+      // Check if booking already exists
+      const existingIdx = current.bookings.findIndex((b: any) => b.id === newBooking.id);
+      let newBookingsList = [...current.bookings];
+      if (existingIdx >= 0) {
+        newBookingsList[existingIdx] = newBooking;
+      } else {
+        newBookingsList.unshift(newBooking);
+      }
+
+      current.bookings = newBookingsList;
+      if (updatedRooms) {
+        current.rooms = updatedRooms;
+      }
+
+      saveDbState(current);
+      return res.json({ success: true, state: current });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to add booking" });
+    }
   });
 
   // API Route for LINE Notifications
