@@ -69,24 +69,25 @@ export default function App() {
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       const db = await fetchServerDb();
       if (db) {
         isRemoteSyncRef.current = true;
         lastUpdatedRef.current = db.lastUpdated || Date.now();
 
-        if (db.rooms && db.rooms.length > 0) {
+        if (db.rooms && Array.isArray(db.rooms)) {
           setRooms(db.rooms);
           localStorage.setItem('dormy_v5_rooms', JSON.stringify(db.rooms));
         }
-        if (db.bookings) {
+        if (db.bookings && Array.isArray(db.bookings)) {
           setBookings(db.bookings);
           localStorage.setItem('dormy_v5_bookings', JSON.stringify(db.bookings));
         }
-        if (db.invoices) {
+        if (db.invoices && Array.isArray(db.invoices)) {
           setInvoices(db.invoices);
           localStorage.setItem('dormy_v5_invoices', JSON.stringify(db.invoices));
         }
-        if (db.tickets) {
+        if (db.tickets && Array.isArray(db.tickets)) {
           setTickets(db.tickets);
           localStorage.setItem('dormy_v5_tickets', JSON.stringify(db.tickets));
         }
@@ -101,7 +102,7 @@ export default function App() {
           localStorage.setItem('dormy_v5_settings', JSON.stringify(newSet));
         }
 
-        setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
+        setTimeout(() => { isRemoteSyncRef.current = false; }, 1000);
       }
 
       const supData = await fetchSupabaseData(settings);
@@ -158,9 +159,13 @@ export default function App() {
     async function syncWithServerDb() {
       const db = await fetchServerDb();
       if (db && isMounted) {
+        if (!isInitialFetchDoneRef.current) {
+          isInitialFetchDoneRef.current = true;
+        }
         if (!lastUpdatedRef.current || (db.lastUpdated && db.lastUpdated > lastUpdatedRef.current)) {
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
+          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
           if (db.rooms) setRooms(db.rooms);
           if (db.bookings) setBookings(db.bookings);
           if (db.invoices) setInvoices(db.invoices);
@@ -172,11 +177,8 @@ export default function App() {
             supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || '',
             supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
           }));
-          setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
+          setTimeout(() => { isRemoteSyncRef.current = false; }, 1000);
         }
-      }
-      if (isMounted && !isInitialFetchDoneRef.current) {
-        isInitialFetchDoneRef.current = true;
       }
     }
 
