@@ -110,6 +110,61 @@ export async function saveSupabaseState(
   }
 }
 
+export async function testSupabaseConnection(
+  settings: SystemSettings
+): Promise<{ success: boolean; reason?: 'paused' | 'missing_table' | 'invalid_keys' | 'network_error'; message: string }> {
+  const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
+  if (!client) {
+    return {
+      success: false,
+      reason: 'invalid_keys',
+      message: '❌ ยังไม่ได้ระบุ Supabase Project URL หรือ Anon Key กรุณากรอกข้อมูลให้ครบถ้วน',
+    };
+  }
+
+  try {
+    const { data, error } = await client.from('dormy_state').select('id').limit(1);
+
+    if (error) {
+      if (error.code === '42P01' || error.message.includes('relation "dormy_state" does not exist') || error.message.includes('dormy_state')) {
+        return {
+          success: false,
+          reason: 'missing_table',
+          message: '⚠️ เชื่อมต่อ Supabase URL ได้สำเร็จแล้ว! แต่ยังไม่ได้สร้างตาราง dormy_state\n\n👉 กรุณากดปุ่ม "📋 คัดลอก SQL Setup" ด้านล่าง แล้วนำไปรันใน SQL Editor บน Supabase Dashboard ครับ',
+        };
+      }
+      return {
+        success: false,
+        reason: 'invalid_keys',
+        message: `❌ Supabase ตอบกลับด้วยข้อผิดพลาด: ${error.message} (รหัส: ${error.code || 'N/A'})`,
+      };
+    }
+
+    return {
+      success: true,
+      message: '✅ การเชื่อมต่อกับ Supabase สมบูรณ์ 100%! ตาราง dormy_state พร้อมซิงค์ข้อมูลกับมือถือและทุกอุปกรณ์',
+    };
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    if (
+      errMsg.includes('Failed to fetch') ||
+      errMsg.includes('TypeError') ||
+      errMsg.includes('NetworkError')
+    ) {
+      return {
+        success: false,
+        reason: 'paused',
+        message: '⚠️ ไม่สามารถเข้าถึง Supabase ได้ (TypeError: Failed to fetch)\n\n💡 สาเหตุหลัก:\n1. โปรเจกต์ Supabase ของคุณถูกระงับชั่วคราว (Paused) เนื่องจากการใช้งาน Free Tier\n   👉 เข้าไปที่ https://supabase.com/dashboard แล้วกดปุ่ม "Restore project" เพื่อเปิดใช้งานใหม่ได้ภายใน 1 นาทีครับ\n2. พิมพ์ URL หรือ Anon Key ไม่ถูกต้อง หรือมีบล็อกเน็ตเวิร์ก/AdBlocker',
+      };
+    }
+    return {
+      success: false,
+      reason: 'network_error',
+      message: `❌ ไม่สามารถเชื่อมต่อ Supabase ได้: ${errMsg}`,
+    };
+  }
+}
+
 export async function pushAllToSupabase(
   allState: {
     rooms?: Room[];
@@ -148,6 +203,12 @@ export async function pushAllToSupabase(
           { onConflict: 'id' }
         );
         if (error) {
+          if (error.code === '42P01' || error.message.includes('relation "dormy_state" does not exist')) {
+            return {
+              success: false,
+              message: '⚠️ ยังไม่ได้สร้างตาราง dormy_state บน Supabase!\n\n👉 กรุณากดปุ่ม "📋 คัดลอก SQL Setup" ด้านล่าง แล้วนำไปวางใน SQL Editor ของ Supabase แล้วกด RUN ก่อนนะครับ',
+            };
+          }
           throw new Error(`Error uploading ${k}: ${error.message}`);
         }
       }
@@ -155,10 +216,9 @@ export async function pushAllToSupabase(
 
     return {
       success: true,
-      message: 'เชื่อมต่อและซิงค์ข้อมูลขึ้น Supabase สำเร็จเรียบร้อยแล้ว!',
+      message: '🎉 พุชและซิงค์ข้อมูลทั้งหมดขึ้น Supabase สำเร็จเรียบร้อย! เปิดจากมือถือหรืออุปกรณ์อื่นจะเห็นข้อมูลเหมือนกันทันทีครับ',
     };
   } catch (err: any) {
-    console.warn('Push to Supabase error:', err);
     let msg = err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase';
     if (
       msg.includes('Failed to fetch') || 
@@ -167,7 +227,7 @@ export async function pushAllToSupabase(
       msg.includes('restricted due to the following violations') ||
       msg.includes('NetworkError')
     ) {
-      msg = '⚠️ ไม่สามารถเชื่อมต่อกับ Supabase ได้ (Failed to fetch / Project Paused or Offline)\n\n💡 สาเหตุที่เป็นไปได้:\n1. โปรเจกต์ Supabase ของคุณอาจถูกระงับชั่วคราว (Paused) หรือเน็ตเวิร์กไม่สามารถเข้าถึง Supabase URL ได้\n2. URL หรือ Anon Key ของ Supabase ไม่ถูกต้องหรือตาราง dormy_state ยังไม่ได้สร้าง\n\n✅ ไม่ต้องกังวล! แอปพลิเคชันยังคงทำงานได้อย่างสมบูรณ์ผ่าน Express Server DB ซึ่งเซฟและซิงค์ข้อมูลห้องพักและการจองข้ามเครื่องให้อัตโนมัติอยู่แล้วครับ';
+      msg = '⚠️ ไม่สามารถเชื่อมต่อกับ Supabase ได้ (Failed to fetch / Project Paused or Offline)\n\n💡 วิธีแก้ไขง่ายๆ:\n1. โปรเจกต์ Supabase ฟรีจะถูกระงับชั่วคราว (Paused) หากเปิดทิ้งไว้ ให้เข้าไปที่ https://supabase.com/dashboard แล้วกด "Restore project"\n2. ตรวจสอบว่าได้กด RUN คำสั่งสร้างตารางใน SQL Editor บน Supabase แล้วหรือยัง';
     }
     return {
       success: false,

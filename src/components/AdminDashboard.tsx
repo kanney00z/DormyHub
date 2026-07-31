@@ -3471,22 +3471,40 @@ export default function AdminDashboard({
                       </div>
                       <div>
                         <h3 className="text-base font-bold text-white flex items-center flex-wrap gap-2">
-                          เชื่อมต่อ Supabase Database (ทางเลือก External Database)
+                          เชื่อมต่อ Supabase Database (จำเป็นสำหรับ Vercel & Sync ข้ามเครื่องมือถือ)
                           {settings.supabaseUrl && settings.supabaseAnonKey ? (
                             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-                              ● มีการระบุ Supabase Credentials
+                              ● ระบุ Credentials แล้ว
                             </span>
                           ) : (
                             <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full border border-sky-500/30 font-mono">
-                              ⚡ ทำงานผ่าน Express Server DB ในตัว (แนะนำ - Real-time Sync)
+                              ○ ยังไม่ได้ระบุ Supabase Key
                             </span>
                           )}
                         </h3>
                         <p className="text-xs text-slate-400">
-                          ระบบซิงค์ข้อมูล Real-time ข้ามเครื่องอัตโนมัติผ่าน Express Server DB อยู่แล้ว <span className="text-slate-300 font-medium">(หากต้องการใช้ Supabase ภายนอกเพิ่มเติม สามารถกรอก URL และ Anon Key ของคุณได้)</span>
+                          เว็บที่ Deploy บน Vercel (<span className="text-emerald-400 font-mono">dormy-hub-five.vercel.app</span>) เป็น Static Frontend จึงต้องการ Supabase เพื่อใช้เป็น Database กลางให้ทุกเครื่อง (PC / มือถือ) แสดงข้อมูลตรงกัน 100%
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Informational Box for Failed to fetch / Paused Supabase */}
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200/90 space-y-2">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-300">
+                      <span>💡</span> สาเหตุที่ขึ้นข้อความ <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-300 font-mono">TypeError: Failed to fetch</code> บนมือถือหรือในระบบ:
+                    </div>
+                    <ol className="list-decimal pl-4 space-y-1 text-slate-300">
+                      <li>
+                        <strong className="text-white">โปรเจกต์ Supabase ถูก Paused (พักการทำงาน):</strong> Supabase Free Tier จะปิดชั่วคราวอัตโนมัติหากไม่มีการใช้งานเกิน 7 วัน
+                      </li>
+                      <li>
+                        <strong className="text-white">วิธีแก้ไข (ใช้เวลา 1 นาที):</strong> เข้าไปที่ <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-emerald-400 underline font-semibold">Supabase Dashboard</a> เลือกโปรเจกต์ของคุณ แล้วกดปุ่ม <strong>"Restore project"</strong> (คืนค่าโปรเจกต์)
+                      </li>
+                      <li>
+                        <strong className="text-white">สร้างตารางข้อมูล:</strong> คัดลอกปุ่ม <span className="text-emerald-300 font-semibold">"📋 คัดลอก SQL Setup"</span> ด้านล่าง ไปวางในเมนู <strong>SQL Editor</strong> ของ Supabase แล้วกด <strong>RUN</strong>
+                      </li>
+                    </ol>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3520,42 +3538,68 @@ export default function AdminDashboard({
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-                    <button
-                      type="button"
-                      disabled={supabaseSyncLoading}
-                      onClick={async () => {
-                        setSupabaseSyncLoading(true);
-                        setSupabaseSyncResult(null);
-                        try {
-                          const mod = await import('../lib/supabase');
-                          const res = await mod.pushAllToSupabase(
-                            { rooms, bookings, invoices, tickets, settings },
-                            settings
-                          );
-                          setSupabaseSyncResult(res);
-                        } catch (err: any) {
-                          setSupabaseSyncResult({
-                            success: false,
-                            message: err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase',
-                          });
-                        } finally {
-                          setSupabaseSyncLoading(false);
-                        }
-                      }}
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      {supabaseSyncLoading ? (
-                        <>
-                          <RotateCw className="w-4 h-4 animate-spin" />
-                          กำลังซิงค์ข้อมูลขึ้น Supabase...
-                        </>
-                      ) : (
-                        <>
-                          <Database className="w-4 h-4" />
-                          🚀 พุช/ส่งข้อมูลทั้งหมดขึ้น Supabase ทันที
-                        </>
-                      )}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={supabaseSyncLoading}
+                        onClick={async () => {
+                          setSupabaseSyncLoading(true);
+                          setSupabaseSyncResult(null);
+                          try {
+                            const mod = await import('../lib/supabase');
+                            const res = await mod.pushAllToSupabase(
+                              { rooms, bookings, invoices, tickets, settings },
+                              settings
+                            );
+                            setSupabaseSyncResult(res);
+                          } catch (err: any) {
+                            setSupabaseSyncResult({
+                              success: false,
+                              message: err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase',
+                            });
+                          } finally {
+                            setSupabaseSyncLoading(false);
+                          }
+                        }}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {supabaseSyncLoading ? (
+                          <>
+                            <RotateCw className="w-4 h-4 animate-spin" />
+                            กำลังซิงค์ข้อมูลขึ้น Supabase...
+                          </>
+                        ) : (
+                          <>
+                            <Database className="w-4 h-4" />
+                            🚀 พุช/ส่งข้อมูลทั้งหมดขึ้น Supabase
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={supabaseSyncLoading}
+                        onClick={async () => {
+                          setSupabaseSyncLoading(true);
+                          setSupabaseSyncResult(null);
+                          try {
+                            const mod = await import('../lib/supabase');
+                            const res = await mod.testSupabaseConnection(settings);
+                            setSupabaseSyncResult(res);
+                          } catch (err: any) {
+                            setSupabaseSyncResult({
+                              success: false,
+                              message: 'เกิดข้อผิดพลาดในการตรวจสอบการเชื่อมต่อ',
+                            });
+                          } finally {
+                            setSupabaseSyncLoading(false);
+                          }
+                        }}
+                        className="px-3.5 py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        🔍 ทดสอบสถานะ Supabase
+                      </button>
+                    </div>
 
                     <button
                       type="button"
@@ -3590,6 +3634,77 @@ export default function AdminDashboard({
 
                   <div className="bg-[#0a0a0f]/80 p-3.5 rounded-xl border border-white/5 text-xs text-slate-400">
                     💡 <strong className="text-white">คำแนะนำการติดตั้งใน Supabase:</strong> คัดลอกโค้ด SQL จากปุ่มด้านบน แล้วนำไปวางในเมนู <span className="text-emerald-400 font-semibold">SQL Editor</span> บน Supabase แล้วกด <span className="text-white font-semibold">Run</span> เพื่อสร้างตาราง <code className="text-emerald-300 font-mono">dormy_state</code>
+                  </div>
+
+                  {/* Manual Data Import / Export Backup Tool for Instant Sync */}
+                  <div className="mt-6 pt-6 border-t border-white/10 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          📱 ทางเลือกด่วน: ส่งออก / นำเข้ารหัสข้อมูล (ซิงค์ตรง PC และ มือถือ)
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          หาก Supabase ยังไม่เปิดทำงาน คุณสามารถคัดลอกรหัสข้อมูลจาก PC ไปวางบนมือถือ เพื่ออัปเดตข้อมูลห้องพักและการจองให้เหมือนกันทันที 100%
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const backupObj = {
+                            rooms,
+                            bookings,
+                            invoices,
+                            tickets,
+                            settings,
+                            exportedAt: new Date().toISOString()
+                          };
+                          const jsonStr = JSON.stringify(backupObj, null, 2);
+                          safeCopyToClipboard(jsonStr);
+                          showNotifyModal(
+                            'ส่งออกข้อมูลสำเร็จ! (คัดลอกลง Clipboard แล้ว)',
+                            'คุณได้คัดลอกรหัสข้อมูลสำรองเรียบร้อยแล้ว',
+                            'นำรหัสนี้ไปส่งทาง LINE หรือวางในเมนู "นำเข้ารหัสข้อมูล" บนมือถือ ข้อมูลจะตรงกันทันทีครับ',
+                            '📤',
+                            'success'
+                          );
+                        }}
+                        className="px-3.5 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        📤 คัดลอกรหัสข้อมูลทั้งหมด (ส่งไปมือถือ)
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const userCode = prompt('วางรหัสข้อมูล (JSON) ที่คัดลอกมาจาก PC หรืออุปกรณ์อื่น:');
+                          if (!userCode || userCode.trim() === '') return;
+                          try {
+                            const parsed = JSON.parse(userCode.trim());
+                            if (parsed.rooms && Array.isArray(parsed.rooms)) onUpdateRooms(parsed.rooms);
+                            if (parsed.bookings && Array.isArray(parsed.bookings)) onUpdateBookings(parsed.bookings);
+                            if (parsed.invoices && Array.isArray(parsed.invoices)) onUpdateInvoices(parsed.invoices);
+                            if (parsed.tickets && Array.isArray(parsed.tickets)) onUpdateTickets(parsed.tickets);
+                            if (parsed.settings && typeof parsed.settings === 'object') onUpdateSettings({ ...settings, ...parsed.settings });
+
+                            showNotifyModal(
+                              'นำเข้าข้อมูลสำเร็จ!',
+                              'ระบบได้อัปเดตข้อมูลห้องพัก การจอง และบิลบนเครื่องนี้เรียบร้อยแล้ว',
+                              'ข้อมูลบนเครื่องนี้จะอัปเดตตรงกับเครื่องต้นทางทันทีครับ',
+                              '📥',
+                              'success'
+                            );
+                          } catch (e) {
+                            alert('รหัสข้อมูลไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง');
+                          }
+                        }}
+                        className="px-3.5 py-2 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        📥 นำเข้ารหัสข้อมูล (อัปเดตบนเครื่องนี้)
+                      </button>
+                    </div>
                   </div>
                 </div>
 
