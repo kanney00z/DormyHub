@@ -3416,7 +3416,7 @@ export default function AdminDashboard({
                           )}
                         </h3>
                         <p className="text-xs text-slate-400">
-                          เมื่อใส่ URL และ Anon Key ข้อมูลการจอง ยูนิต และบิลจะแสดงผลเหมือนกันทุกเครื่องแบบ Real-time
+                          เมื่อใส่ URL และ Anon Key ข้อมูลการจอง ยูนิต และบิลจะแสดงผลเหมือนกันทุกเครื่องแบบ Real-time <span className="inline-block mt-1 sm:mt-0 px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px] font-medium">🔒 บันทึกถาวรลงระบบแล้ว (เปิดจากเครื่องอื่นใช้งานได้ทันที)</span>
                         </p>
                       </div>
                     </div>

@@ -47,7 +47,12 @@ export default function App() {
         if (parsed.lineTokenType === 'Notify' && (!parsed.lineNotifyToken || parsed.lineChannelAccessToken)) {
           parsed.lineTokenType = 'MessagingApi';
         }
-        return parsed;
+        return {
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          supabaseUrl: parsed.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+          supabaseAnonKey: parsed.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+        };
       } catch (e) {
         return DEFAULT_SETTINGS;
       }
@@ -72,7 +77,13 @@ export default function App() {
           if (db.bookings) setBookings(db.bookings);
           if (db.invoices) setInvoices(db.invoices);
           if (db.tickets) setTickets(db.tickets);
-          if (db.settings) setSettings(prev => ({ ...prev, ...db.settings }));
+          if (db.settings) setSettings(prev => ({
+            ...DEFAULT_SETTINGS,
+            ...prev,
+            ...db.settings,
+            supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+            supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+          }));
           setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
         }
       }
@@ -95,7 +106,13 @@ export default function App() {
         if (data.bookings) setBookings(data.bookings);
         if (data.invoices) setInvoices(data.invoices);
         if (data.tickets) setTickets(data.tickets);
-        if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+        if (data.settings) setSettings(prev => ({
+          ...DEFAULT_SETTINGS,
+          ...prev,
+          ...data.settings,
+          supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+          supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+        }));
         setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
       }
     }
@@ -118,7 +135,13 @@ export default function App() {
               if (id === 'bookings') setBookings(newData);
               if (id === 'invoices') setInvoices(newData);
               if (id === 'tickets') setTickets(newData);
-              if (id === 'settings') setSettings(prev => ({ ...prev, ...newData }));
+              if (id === 'settings') setSettings(prev => ({
+                ...DEFAULT_SETTINGS,
+                ...prev,
+                ...newData,
+                supabaseUrl: newData.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+                supabaseAnonKey: newData.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+              }));
               setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
             }
           }

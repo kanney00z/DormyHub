@@ -19,6 +19,8 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   lineNotifyToken: '',
   lineChannelAccessToken: '',
   lineUserId: '',
+  supabaseUrl: 'https://iyiwangdlyqteukhhva.supabase.co',
+  supabaseAnonKey: 'sb_publishable_GNoGpqaIcb1nEvpjEF96oQ_eeyr5P2r',
 };
 
 export const INITIAL_ROOMS: Room[] = [
