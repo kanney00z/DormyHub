@@ -18,20 +18,24 @@ async function startServer() {
 
   const dbFilePath = path.join(dataDir, "db.json");
 
-  // Helper to load DB state
-  function getDbState() {
+  // In-memory DB cache for 100% thread-safe atomic updates
+  let inMemoryDb: any = null;
+
+  function loadDbState() {
+    if (inMemoryDb) return inMemoryDb;
     try {
       if (fs.existsSync(dbFilePath)) {
         const raw = fs.readFileSync(dbFilePath, "utf-8");
         const parsed = JSON.parse(raw);
         if (parsed && Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
-          return parsed;
+          inMemoryDb = parsed;
+          return inMemoryDb;
         }
       }
     } catch (err) {
       console.error("Error reading db.json, resetting to initial state:", err);
     }
-    const initState = {
+    inMemoryDb = {
       rooms: INITIAL_ROOMS,
       bookings: INITIAL_BOOKINGS,
       invoices: INITIAL_INVOICES,
@@ -39,26 +43,30 @@ async function startServer() {
       settings: DEFAULT_SETTINGS,
       lastUpdated: Date.now(),
     };
-    try {
-      fs.writeFileSync(dbFilePath, JSON.stringify(initState, null, 2), "utf-8");
-    } catch (e) {}
-    return initState;
+    persistDbToDiskSync();
+    return inMemoryDb;
   }
 
-  // Helper to save DB state
-  function saveDbState(state: any) {
+  function persistDbToDiskSync() {
     try {
-      state.lastUpdated = Date.now();
-      fs.writeFileSync(dbFilePath, JSON.stringify(state, null, 2), "utf-8");
-      return state.lastUpdated;
+      if (inMemoryDb) {
+        fs.writeFileSync(dbFilePath, JSON.stringify(inMemoryDb, null, 2), "utf-8");
+      }
     } catch (err) {
-      console.error("Error saving db.json:", err);
-      return Date.now();
+      console.error("Error writing db.json:", err);
     }
   }
 
+  let saveTimer: NodeJS.Timeout | null = null;
+  function queuePersistDbToDisk() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      persistDbToDiskSync();
+    }, 100);
+  }
+
   // Ensure DB initialized on server boot
-  getDbState();
+  loadDbState();
 
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const startTime = Date.now();
@@ -74,27 +82,25 @@ async function startServer() {
 
   // GET /api/db - Returns shared server state for multi-device sync
   app.get("/api/db", (req: express.Request, res: express.Response) => {
-    const state = getDbState();
+    const state = loadDbState();
     return res.json(state);
   });
 
-  // POST /api/db - Saves complete or partial shared state
+  // POST /api/db - Saves complete or partial shared state atomically in memory
   app.post("/api/db", (req: express.Request, res: express.Response) => {
     try {
-      const current = getDbState();
+      const db = loadDbState();
       const { rooms, bookings, invoices, tickets, settings } = req.body;
 
-      const updatedState = {
-        rooms: rooms !== undefined ? rooms : current.rooms,
-        bookings: bookings !== undefined ? bookings : current.bookings,
-        invoices: invoices !== undefined ? invoices : current.invoices,
-        tickets: tickets !== undefined ? tickets : current.tickets,
-        settings: settings !== undefined ? settings : current.settings,
-        lastUpdated: Date.now(),
-      };
+      if (rooms !== undefined) db.rooms = rooms;
+      if (bookings !== undefined) db.bookings = bookings;
+      if (invoices !== undefined) db.invoices = invoices;
+      if (tickets !== undefined) db.tickets = tickets;
+      if (settings !== undefined) db.settings = settings;
+      db.lastUpdated = Date.now();
 
-      const lastUpdated = saveDbState(updatedState);
-      return res.json({ success: true, lastUpdated, state: updatedState });
+      queuePersistDbToDisk();
+      return res.json({ success: true, lastUpdated: db.lastUpdated, state: db });
     } catch (err: any) {
       console.error("Error syncing DB state:", err);
       return res.status(500).json({ error: err.message || "Failed to update DB" });
@@ -104,7 +110,7 @@ async function startServer() {
   // POST /api/db/reset - Reset DB back to initial default state
   app.post("/api/db/reset", (req: express.Request, res: express.Response) => {
     try {
-      const initState = {
+      inMemoryDb = {
         rooms: INITIAL_ROOMS,
         bookings: INITIAL_BOOKINGS,
         invoices: INITIAL_INVOICES,
@@ -112,8 +118,8 @@ async function startServer() {
         settings: DEFAULT_SETTINGS,
         lastUpdated: Date.now(),
       };
-      saveDbState(initState);
-      return res.json({ success: true, state: initState });
+      persistDbToDiskSync();
+      return res.json({ success: true, state: inMemoryDb });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || "Failed to reset DB" });
     }
@@ -122,7 +128,7 @@ async function startServer() {
   // POST /api/db/booking - Atomically add or update a booking and sync across all connected clients
   app.post("/api/db/booking", (req: express.Request, res: express.Response) => {
     try {
-      const current = getDbState();
+      const db = loadDbState();
       const newBooking = req.body.booking;
       const updatedRooms = req.body.rooms;
 
@@ -131,21 +137,20 @@ async function startServer() {
       }
 
       // Check if booking already exists
-      const existingIdx = current.bookings.findIndex((b: any) => b.id === newBooking.id);
-      let newBookingsList = [...current.bookings];
+      const existingIdx = db.bookings.findIndex((b: any) => b.id === newBooking.id);
       if (existingIdx >= 0) {
-        newBookingsList[existingIdx] = newBooking;
+        db.bookings[existingIdx] = newBooking;
       } else {
-        newBookingsList.unshift(newBooking);
+        db.bookings.unshift(newBooking);
       }
 
-      current.bookings = newBookingsList;
       if (updatedRooms) {
-        current.rooms = updatedRooms;
+        db.rooms = updatedRooms;
       }
 
-      saveDbState(current);
-      return res.json({ success: true, state: current });
+      db.lastUpdated = Date.now();
+      queuePersistDbToDisk();
+      return res.json({ success: true, state: db });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || "Failed to add booking" });
     }

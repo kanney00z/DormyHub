@@ -71,21 +71,42 @@ export default function App() {
     try {
       const db = await fetchServerDb();
       if (db) {
-        if (db.rooms && db.rooms.length > 0) setRooms(db.rooms);
-        if (db.bookings) setBookings(db.bookings);
-        if (db.invoices) setInvoices(db.invoices);
-        if (db.tickets) setTickets(db.tickets);
-        if (db.settings) setSettings(prev => ({
-          ...DEFAULT_SETTINGS,
-          ...prev,
-          ...db.settings,
-          supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-          supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
-        }));
+        isRemoteSyncRef.current = true;
+        lastUpdatedRef.current = db.lastUpdated || Date.now();
+
+        if (db.rooms && db.rooms.length > 0) {
+          setRooms(db.rooms);
+          localStorage.setItem('dormy_v5_rooms', JSON.stringify(db.rooms));
+        }
+        if (db.bookings) {
+          setBookings(db.bookings);
+          localStorage.setItem('dormy_v5_bookings', JSON.stringify(db.bookings));
+        }
+        if (db.invoices) {
+          setInvoices(db.invoices);
+          localStorage.setItem('dormy_v5_invoices', JSON.stringify(db.invoices));
+        }
+        if (db.tickets) {
+          setTickets(db.tickets);
+          localStorage.setItem('dormy_v5_tickets', JSON.stringify(db.tickets));
+        }
+        if (db.settings) {
+          const newSet = {
+            ...DEFAULT_SETTINGS,
+            ...db.settings,
+            supabaseUrl: db.settings.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+            supabaseAnonKey: db.settings.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+          };
+          setSettings(newSet);
+          localStorage.setItem('dormy_v5_settings', JSON.stringify(newSet));
+        }
+
+        setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
       }
 
       const supData = await fetchSupabaseData(settings);
       if (supData) {
+        isRemoteSyncRef.current = true;
         if (supData.rooms && supData.rooms.length > 0) setRooms(supData.rooms);
         if (supData.bookings) setBookings(supData.bookings);
         if (supData.invoices) setInvoices(supData.invoices);
@@ -94,18 +115,9 @@ export default function App() {
           ...DEFAULT_SETTINGS,
           ...prev,
           ...supData.settings,
-          supabaseUrl: supData.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-          supabaseAnonKey: supData.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
         }));
+        setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
       }
-
-      // Enforce saving back to server & Supabase
-      await saveServerDb({ rooms, bookings, invoices, tickets, settings });
-      await saveSupabaseState('rooms', rooms, settings);
-      await saveSupabaseState('bookings', bookings, settings);
-      await saveSupabaseState('invoices', invoices, settings);
-      await saveSupabaseState('tickets', tickets, settings);
-      await saveSupabaseState('settings', settings, settings);
 
       setShowSyncSuccess(true);
       setTimeout(() => setShowSyncSuccess(false), 4000);
@@ -214,46 +226,29 @@ export default function App() {
     };
   }, [settings.supabaseUrl, settings.supabaseAnonKey]);
 
-  // Save states automatically on changes to localStorage, Express Server DB AND Supabase
+  // Consolidated auto-save to localStorage, Express Server DB AND Supabase
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     localStorage.setItem('dormy_v5_rooms', JSON.stringify(rooms));
-    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
-      saveServerDb({ rooms });
-      saveSupabaseState('rooms', rooms, settings);
-    }
-  }, [rooms, settings]);
-
-  useEffect(() => {
     localStorage.setItem('dormy_v5_bookings', JSON.stringify(bookings));
-    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
-      saveServerDb({ bookings });
-      saveSupabaseState('bookings', bookings, settings);
-    }
-  }, [bookings, settings]);
-
-  useEffect(() => {
     localStorage.setItem('dormy_v5_invoices', JSON.stringify(invoices));
-    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
-      saveServerDb({ invoices });
-      saveSupabaseState('invoices', invoices, settings);
-    }
-  }, [invoices, settings]);
-
-  useEffect(() => {
     localStorage.setItem('dormy_v5_tickets', JSON.stringify(tickets));
-    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
-      saveServerDb({ tickets });
-      saveSupabaseState('tickets', tickets, settings);
-    }
-  }, [tickets, settings]);
-
-  useEffect(() => {
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
+
     if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
-      saveServerDb({ settings });
-      saveSupabaseState('settings', settings, settings);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+      saveTimeoutRef.current = setTimeout(() => {
+        saveServerDb({ rooms, bookings, invoices, tickets, settings });
+        saveSupabaseState('rooms', rooms, settings);
+        saveSupabaseState('bookings', bookings, settings);
+        saveSupabaseState('invoices', invoices, settings);
+        saveSupabaseState('tickets', tickets, settings);
+        saveSupabaseState('settings', settings, settings);
+      }, 200);
     }
-  }, [settings]);
+  }, [rooms, bookings, invoices, tickets, settings]);
 
   // Handle addition of a booking (can be from customer or admin)
   const handleAddBooking = async (newBookingData: Omit<Booking, 'id' | 'createdAt'>) => {

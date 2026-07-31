@@ -66,7 +66,7 @@ export async function fetchSupabaseData(
   try {
     const { data, error } = await client.from('dormy_state').select('*');
     if (error || !data) {
-      console.warn('Supabase fetch error or table missing:', error?.message);
+      console.warn('Supabase fetch notice:', error?.message || 'No data');
       return null;
     }
 
@@ -82,8 +82,8 @@ export async function fetchSupabaseData(
       tickets: result['tickets'],
       settings: result['settings'],
     };
-  } catch (err) {
-    console.error('Error fetching Supabase data:', err);
+  } catch (err: any) {
+    console.warn('Supabase unreachable or fetch error:', err?.message || err);
     return null;
   }
 }
@@ -105,8 +105,8 @@ export async function saveSupabaseState(
       },
       { onConflict: 'id' }
     );
-  } catch (err) {
-    console.error(`Error saving ${key} to Supabase:`, err);
+  } catch (err: any) {
+    console.warn(`Note: Could not save ${key} to Supabase:`, err?.message || err);
   }
 }
 
@@ -158,10 +158,16 @@ export async function pushAllToSupabase(
       message: 'เชื่อมต่อและซิงค์ข้อมูลขึ้น Supabase สำเร็จเรียบร้อยแล้ว!',
     };
   } catch (err: any) {
-    console.error('Push to Supabase error:', err);
+    console.warn('Push to Supabase error:', err);
     let msg = err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase';
-    if (msg.includes('exceed_egress_quota') || msg.includes('restricted due to the following violations')) {
-      msg = '⚠️ โปรเจกต์ Supabase ของคุณถูกระงับชั่วคราวเนื่องจากใช้งานเกินโควต้าฟรี (exceed_egress_quota) บน Supabase Console\n\n✅ แต่ไม่ต้องกังวล! ระบบได้ใช้ Express Server DB (แชร์ฐานข้อมูลภายในแอป) ในการเซฟและซิงค์ข้อมูลการจองและห้องพักข้ามเครื่องอัตโนมัติให้อยู่แล้วครับ';
+    if (
+      msg.includes('Failed to fetch') || 
+      msg.includes('TypeError') || 
+      msg.includes('exceed_egress_quota') || 
+      msg.includes('restricted due to the following violations') ||
+      msg.includes('NetworkError')
+    ) {
+      msg = '⚠️ ไม่สามารถเชื่อมต่อกับ Supabase ได้ (Failed to fetch / Project Paused or Offline)\n\n💡 สาเหตุที่เป็นไปได้:\n1. โปรเจกต์ Supabase ของคุณอาจถูกระงับชั่วคราว (Paused) หรือเน็ตเวิร์กไม่สามารถเข้าถึง Supabase URL ได้\n2. URL หรือ Anon Key ของ Supabase ไม่ถูกต้องหรือตาราง dormy_state ยังไม่ได้สร้าง\n\n✅ ไม่ต้องกังวล! แอปพลิเคชันยังคงทำงานได้อย่างสมบูรณ์ผ่าน Express Server DB ซึ่งเซฟและซิงค์ข้อมูลห้องพักและการจองข้ามเครื่องให้อัตโนมัติอยู่แล้วครับ';
     }
     return {
       success: false,
