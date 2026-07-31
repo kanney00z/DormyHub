@@ -5,7 +5,14 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   waterUnitRate: 18,     // 18 บาท/หน่วย
   commonFee: 300,        // ค่าส่วนกลางรายเดือน
   securityDepositMultiplier: 1, // มัดจำ 1 เดือน
+  depositType: 'multiplier',
+  customFixedDeposit: 3500,
   propertyName: 'DORMYHUB',
+  heroTitle: 'สัมผัสประสบการณ์การพักผ่อน',
+  heroSubtitle: 'บริการห้องพักรายวันสุดหรู และรายเดือนดีไซน์พรีเมียม พร้อมระบบบริหารจัดการค่าน้ำค่าไฟหลังบ้านที่โปร่งใส ตรวจสอบได้ทุกยูนิต',
+  showHeroTitle: true,
+  showHeroSubtitle: true,
+  showHeroSection: true,
   promptPayNumber: '089-123-4567',
   lineNotificationEnabled: false,
   lineTokenType: 'MessagingApi',

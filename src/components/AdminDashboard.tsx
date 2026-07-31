@@ -5,7 +5,7 @@ import {
   Trash2, FileText, Check, Clock, TrendingUp, AlertTriangle, 
   Home, ClipboardList, CreditCard, ChevronRight, CheckCircle2, DollarSign, Edit3, X, HelpCircle,
   Upload, Image as ImageIcon, Bell, Send, AlertCircle, Calendar, ChevronLeft, Wrench, Sparkles,
-  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity
+  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, AreaChart, Area
@@ -110,12 +110,19 @@ export default function AdminDashboard({
   const [deleteConfirmTicketId, setDeleteConfirmTicketId] = useState<string | null>(null);
   const [filterHistoryRoomId, setFilterHistoryRoomId] = useState<string>('All');
 
-  // UPGRADE 2 & 3: Filter, Search, and Viewer states
+  // UPGRADE 1, 2 & 3: Filter, Search, and Viewer states
+  const [chartTab, setChartTab] = useState<'revenue' | 'utility'>('revenue');
+  const [roomSearchText, setRoomSearchText] = useState('');
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'All' | 'Available' | 'Occupied' | 'Maintenance'>('All');
   const [floorFilter, setFloorFilter] = useState<number | 'All'>('All');
   const [bookingSearchText, setBookingSearchText] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState<'All' | 'Active' | 'Pending' | 'CheckedOut' | 'Cancelled'>('All');
   const [invoiceSearchText, setInvoiceSearchText] = useState('');
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<'All' | 'Paid' | 'Unpaid'>('All');
+  const [ticketSearchText, setTicketSearchText] = useState('');
+  const [ticketUrgencyFilter, setTicketUrgencyFilter] = useState<'All' | 'low' | 'medium' | 'high'>('All');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<'All' | 'Pending' | 'In Progress' | 'Resolved'>('All');
+  const [ticketCategoryFilter, setTicketCategoryFilter] = useState<'All' | 'aircon' | 'plumbing' | 'electricity' | 'furniture' | 'other'>('All');
   
   // UPGRADE 4: Slip Zoom & Viewer state
   const [selectedSlipInvoice, setSelectedSlipInvoice] = useState<UtilityInvoice | null>(null);
@@ -171,8 +178,33 @@ export default function AdminDashboard({
 
   // UPGRADE 2 & 3: Memoized filter logic for rooms, bookings, and invoices
   const filteredRooms = useMemo(() => {
-    return rooms.filter(room => floorFilter === 'All' || room.floor === floorFilter);
-  }, [rooms, floorFilter]);
+    return rooms.filter(room => {
+      const matchFloor = floorFilter === 'All' || room.floor === floorFilter;
+      const matchStatus = roomStatusFilter === 'All' || room.status === roomStatusFilter;
+      const matchSearch = roomSearchText === '' ||
+        room.number.includes(roomSearchText) ||
+        room.type.toLowerCase().includes(roomSearchText.toLowerCase()) ||
+        room.description.toLowerCase().includes(roomSearchText.toLowerCase()) ||
+        room.amenities.some(a => a.toLowerCase().includes(roomSearchText.toLowerCase()));
+      return matchFloor && matchStatus && matchSearch;
+    });
+  }, [rooms, floorFilter, roomStatusFilter, roomSearchText]);
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(t => {
+      const matchSearch = ticketSearchText === '' ||
+        t.roomNumber.includes(ticketSearchText) ||
+        t.guestName.toLowerCase().includes(ticketSearchText.toLowerCase()) ||
+        t.description.toLowerCase().includes(ticketSearchText.toLowerCase()) ||
+        t.id.toLowerCase().includes(ticketSearchText.toLowerCase());
+
+      const matchUrgency = ticketUrgencyFilter === 'All' || t.urgency === ticketUrgencyFilter;
+      const matchStatus = ticketStatusFilter === 'All' || t.status === ticketStatusFilter;
+      const matchCategory = ticketCategoryFilter === 'All' || t.category === ticketCategoryFilter;
+
+      return matchSearch && matchUrgency && matchStatus && matchCategory;
+    });
+  }, [tickets, ticketSearchText, ticketUrgencyFilter, ticketStatusFilter, ticketCategoryFilter]);
 
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
@@ -678,6 +710,34 @@ export default function AdminDashboard({
     document.body.removeChild(link);
   };
 
+  const handleExportTicketsToCSV = () => {
+    const headers = ['Ticket ID', 'Room Number', 'Guest Name', 'Phone', 'Category', 'Urgency', 'Description', 'Status', 'Created At', 'Resolved At', 'Admin Notes'];
+    const rows = tickets.map(t => [
+      t.id,
+      t.roomNumber,
+      t.guestName,
+      t.guestPhone,
+      t.category,
+      t.urgency,
+      t.description,
+      t.status,
+      t.createdAt,
+      t.resolvedAt || 'N/A',
+      t.adminNotes || 'N/A'
+    ]);
+    
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(','), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\n');
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `dormy_maintenance_tickets_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Generate beautiful text message for each simulation tab
   const getSimulatedMessageText = (tab: 'booking' | 'invoice' | 'payment' | 'status') => {
     const property = settings.propertyName || 'DORMYHUB';
@@ -890,54 +950,87 @@ export default function AdminDashboard({
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/20 hover:shadow-[0_4px_30px_rgba(37,99,235,0.1)] transition-all duration-300 flex items-center justify-between group">
+              <div 
+                onClick={() => {
+                  setActiveTab('utilities');
+                  setInvoiceStatusFilter('All');
+                  setInvoiceSearchText('');
+                }}
+                className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/40 hover:shadow-[0_4px_30px_rgba(37,99,235,0.15)] transition-all duration-300 flex items-center justify-between group cursor-pointer"
+                title="คลิกเพื่อไปที่หน้ารายการบิลทั้งหมด"
+              >
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">รายได้ประมาณการเดือนนี้</span>
+                  <span className="text-xs text-slate-400 block font-medium group-hover:text-slate-200 transition-colors">รายได้ประมาณการเดือนนี้</span>
                   <span className="text-3xl font-extrabold text-white mt-1.5 block tracking-tight">฿{stats.revenueThisMonth.toLocaleString()}</span>
                   <span className="text-xs text-emerald-400 flex items-center gap-1 mt-2 font-medium">
                     <TrendingUp className="w-3.5 h-3.5" /> +12.4% คาดการณ์
                   </span>
                 </div>
-                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.15)]">
+                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(16,185,129,0.15)] group-hover:bg-emerald-500/20 transition-all">
                   <DollarSign className="w-6 h-6" />
                 </div>
               </div>
 
-              <div className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/20 hover:shadow-[0_4px_30px_rgba(37,99,235,0.1)] transition-all duration-300 flex items-center justify-between group">
+              <div 
+                onClick={() => {
+                  setActiveTab('rooms');
+                  setRoomStatusFilter('All');
+                  setFloorFilter('All');
+                  setRoomSearchText('');
+                }}
+                className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/40 hover:shadow-[0_4px_30px_rgba(37,99,235,0.15)] transition-all duration-300 flex items-center justify-between group cursor-pointer"
+                title="คลิกเพื่อดูสถานะห้องพักทั้งหมด"
+              >
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">อัตราการเช่าห้องพัก</span>
+                  <span className="text-xs text-slate-400 block font-medium group-hover:text-slate-200 transition-colors">อัตราการเช่าห้องพัก</span>
                   <span className="text-3xl font-extrabold text-white mt-1.5 block tracking-tight">{stats.occupancyRate}%</span>
-                  <span className="text-xs text-slate-300 block mt-2 font-light">
+                  <span className="text-xs text-slate-300 block mt-2 font-light group-hover:text-slate-200 transition-colors">
                     ว่าง <span className="text-emerald-400 font-semibold">{stats.availableCount}</span> / มีผู้เช่า <span className="text-brand-400 font-semibold">{stats.occupiedCount}</span> ยูนิต
                   </span>
                 </div>
-                <div className="w-12 h-12 bg-brand-500/10 text-brand-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(37,99,235,0.15)]">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(37,99,235,0.15)] group-hover:bg-brand-500/20 transition-all">
                   <Users className="w-6 h-6" />
                 </div>
               </div>
 
-              <div className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/20 hover:shadow-[0_4px_30px_rgba(37,99,235,0.1)] transition-all duration-300 flex items-center justify-between group">
+              <div 
+                onClick={() => {
+                  setActiveTab('utilities');
+                  setInvoiceStatusFilter('Unpaid');
+                  setInvoiceSearchText('');
+                }}
+                className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-rose-500/40 hover:shadow-[0_4px_30px_rgba(244,63,94,0.15)] transition-all duration-300 flex items-center justify-between group cursor-pointer"
+                title="คลิกเพื่อคัดกรองบิลที่ค้างชำระ"
+              >
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">บิลน้ำ-ไฟค้างชำระ</span>
+                  <span className="text-xs text-slate-400 block font-medium group-hover:text-rose-300 transition-colors">บิลน้ำ-ไฟค้างชำระ</span>
                   <span className="text-3xl font-extrabold text-rose-400 mt-1.5 block tracking-tight">{stats.pendingUtilityInvoices} ห้อง</span>
-                  <span className="text-xs text-slate-300 block mt-2 font-light">
+                  <span className="text-xs text-slate-300 block mt-2 font-light group-hover:text-rose-200 transition-colors">
                     รอทำรายการชำระเงิน
                   </span>
                 </div>
-                <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.15)]">
+                <div className="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(244,63,94,0.15)] group-hover:bg-rose-500/20 transition-all">
                   <Zap className="w-6 h-6" />
                 </div>
               </div>
 
-              <div className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-brand-500/20 hover:shadow-[0_4px_30px_rgba(37,99,235,0.1)] transition-all duration-300 flex items-center justify-between group">
+              <div 
+                onClick={() => {
+                  setActiveTab('maintenance');
+                  setTicketStatusFilter('Pending');
+                  setTicketSearchText('');
+                }}
+                className="bg-[#121216]/90 p-6 rounded-2xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] hover:border-amber-500/40 hover:shadow-[0_4px_30px_rgba(245,158,11,0.15)] transition-all duration-300 flex items-center justify-between group cursor-pointer"
+                title="คลิกเพื่อดูแจ้งซ่อมที่รอคิว"
+              >
                 <div>
-                  <span className="text-xs text-slate-400 block font-medium">ห้องพักชำรุด/ปรับปรุง</span>
+                  <span className="text-xs text-slate-400 block font-medium group-hover:text-amber-300 transition-colors">ห้องพักชำรุด/ปรับปรุง</span>
                   <span className="text-3xl font-extrabold text-amber-400 mt-1.5 block tracking-tight">{stats.maintenanceCount} ห้อง</span>
-                  <span className="text-xs text-slate-300 block mt-2 font-light">
+                  <span className="text-xs text-slate-300 block mt-2 font-light group-hover:text-amber-200 transition-colors">
                     อยู่ระหว่างการซ่อมแซม
                   </span>
                 </div>
-                <div className="w-12 h-12 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.15)]">
+                <div className="w-12 h-12 bg-amber-500/10 text-amber-400 rounded-xl flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.15)] group-hover:bg-amber-500/20 transition-all">
                   <AlertTriangle className="w-6 h-6" />
                 </div>
               </div>
@@ -945,67 +1038,153 @@ export default function AdminDashboard({
 
             {/* UPGRADE 1: Interactive Dashboard Analytics & Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Revenue Trend Chart */}
-              <div className="lg:col-span-2 bg-[#121216]/90 p-6 rounded-3xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)]">
-                <div className="flex items-center justify-between mb-4">
+              {/* Revenue / Utility Trend Chart */}
+              <div className="lg:col-span-2 bg-[#121216]/90 p-6 rounded-3xl border border-white/10 shadow-[0_4px_25px_rgba(0,0,0,0.3)] flex flex-col justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                   <div>
                     <h3 className="text-base font-bold text-white flex items-center gap-1.5">
-                      <TrendingUp className="w-4 h-4 text-emerald-400" /> สรุปแนวโน้มรายรับประจำโครงการ
+                      {chartTab === 'revenue' ? (
+                        <>
+                          <TrendingUp className="w-4 h-4 text-emerald-400" /> สรุปแนวโน้มรายรับประจำโครงการ
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-amber-400" /> อัตราการใช้งานสาธารณูปโภค (หน่วย)
+                        </>
+                      )}
                     </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">กราฟแสดงเปรียบเทียบยอดชำระแล้ว (สีเขียว) และยอดค้างชำระ (สีแดง)</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {chartTab === 'revenue' 
+                        ? 'เปรียบเทียบยอดชำระเงินสำเร็จ (สีเขียว) และยอดค้างจ่าย (สีแดง) ย้อนหลัง' 
+                        : 'แนวโน้มการใช้น้ำ (ลูกบาศก์เมตร) และไฟ (หน่วยไฟฟ้า) ของทั้งโครงการ'}
+                    </p>
                   </div>
-                  <span className="text-xxs px-2.5 py-1 bg-slate-800 border border-slate-700/60 rounded-lg text-slate-300 font-mono uppercase font-bold tracking-wider">6 MONTHS</span>
+                  
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setChartTab('revenue')}
+                      className={`px-3 py-1.5 text-xxs font-semibold rounded-lg transition-all cursor-pointer ${
+                        chartTab === 'revenue' 
+                          ? 'bg-brand-500 text-slate-950 shadow' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      💰 รายรับโครงการ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartTab('utility')}
+                      className={`px-3 py-1.5 text-xxs font-semibold rounded-lg transition-all cursor-pointer ${
+                        chartTab === 'utility' 
+                          ? 'bg-brand-500 text-slate-950 shadow' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      ⚡ การใช้น้ำ/ไฟ
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="h-[220px] w-full mt-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={(() => {
-                        const billingMonthsList = ['มกราคม 2569', 'กุมภาพันธ์ 2569', 'มีนาคม 2569', 'เมษายน 2569', 'พฤษภาคม 2569', 'มิถุนายน 2569'];
-                        return billingMonthsList.map(m => {
-                          const monthlyInvoices = invoices.filter(inv => inv.billingMonth === m);
-                          const paidSum = monthlyInvoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + inv.totalCost, 0);
-                          const unpaidSum = monthlyInvoices.filter(inv => inv.status === 'Unpaid').reduce((sum, inv) => sum + inv.totalCost, 0);
-                          
-                          // Inject beautiful realistic fallback/initial data for previous months
-                          let seedRents = 0;
-                          if (m === 'มกราคม 2569') seedRents = 8400;
-                          if (m === 'กุมภาพันธ์ 2569') seedRents = 12500;
-                          if (m === 'มีนาคม 2569') seedRents = 11200;
-                          if (m === 'เมษายน 2569') seedRents = 15800;
-                          
-                          return {
-                            name: m.split(' ')[0], // Only use month name for cleaner axis
-                            'ชำระแล้ว (Paid)': paidSum + (seedRents > 0 ? seedRents : 0),
-                            'ค้างชำระ (Unpaid)': unpaidSum,
-                            'รายรับรวม': paidSum + unpaidSum + seedRents
-                          };
-                        });
-                      })()}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorUnpaid" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                      <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#09090b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                        labelStyle={{ color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}
-                        itemStyle={{ fontSize: '11px' }}
-                      />
-                      <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                      <Area type="monotone" dataKey="ชำระแล้ว (Paid)" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorPaid)" />
-                      <Area type="monotone" dataKey="ค้างชำระ (Unpaid)" stroke="#f43f5e" strokeWidth={1.5} fillOpacity={1} fill="url(#colorUnpaid)" />
-                    </AreaChart>
+                    {chartTab === 'revenue' ? (
+                      <AreaChart
+                        data={(() => {
+                          const billingMonthsList = ['มกราคม 2569', 'กุมภาพันธ์ 2569', 'มีนาคม 2569', 'เมษายน 2569', 'พฤษภาคม 2569', 'มิถุนายน 2569'];
+                          return billingMonthsList.map(m => {
+                            const monthlyInvoices = invoices.filter(inv => inv.billingMonth === m);
+                            const paidSum = monthlyInvoices.filter(inv => inv.status === 'Paid').reduce((sum, inv) => sum + inv.totalCost, 0);
+                            const unpaidSum = monthlyInvoices.filter(inv => inv.status === 'Unpaid').reduce((sum, inv) => sum + inv.totalCost, 0);
+                            
+                            // Inject beautiful realistic fallback/initial data for previous months
+                            let seedRents = 0;
+                            if (m === 'มกราคม 2569') seedRents = 8400;
+                            if (m === 'กุมภาพันธ์ 2569') seedRents = 12500;
+                            if (m === 'มีนาคม 2569') seedRents = 11200;
+                            if (m === 'เมษายน 2569') seedRents = 15800;
+                            
+                            return {
+                              name: m.split(' ')[0], // Only use month name for cleaner axis
+                              'ชำระแล้ว (Paid)': paidSum + (seedRents > 0 ? seedRents : 0),
+                              'ค้างชำระ (Unpaid)': unpaidSum,
+                              'รายรับรวม': paidSum + unpaidSum + seedRents
+                            };
+                          });
+                        })()}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorUnpaid" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#09090b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                          labelStyle={{ color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}
+                          itemStyle={{ fontSize: '11px' }}
+                        />
+                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                        <Area type="monotone" dataKey="ชำระแล้ว (Paid)" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorPaid)" />
+                        <Area type="monotone" dataKey="ค้างชำระ (Unpaid)" stroke="#f43f5e" strokeWidth={1.5} fillOpacity={1} fill="url(#colorUnpaid)" />
+                      </AreaChart>
+                    ) : (
+                      <AreaChart
+                        data={(() => {
+                          const billingMonthsList = ['มกราคม 2569', 'กุมภาพันธ์ 2569', 'มีนาคม 2569', 'เมษายน 2569', 'พฤษภาคม 2569', 'มิถุนายน 2569'];
+                          return billingMonthsList.map(m => {
+                            const monthlyInvoices = invoices.filter(inv => inv.billingMonth === m);
+                            const electricityUnits = monthlyInvoices.reduce((sum, inv) => sum + (inv.currElectricity - inv.prevElectricity), 0);
+                            const waterUnits = monthlyInvoices.reduce((sum, inv) => sum + (inv.currWater - inv.prevWater), 0);
+                            
+                            let seedElec = 0;
+                            let seedWater = 0;
+                            if (m === 'มกราคม 2569') { seedElec = 240; seedWater = 32; }
+                            if (m === 'กุมภาพันธ์ 2569') { seedElec = 380; seedWater = 45; }
+                            if (m === 'มีนาคม 2569') { seedElec = 410; seedWater = 48; }
+                            if (m === 'เมษายน 2569') { seedElec = 680; seedWater = 72; }
+                            if (m === 'พฤษภาคม 2569') { seedElec = 720; seedWater = 80; }
+
+                            return {
+                              name: m.split(' ')[0],
+                              'กระแสไฟฟ้า (หน่วย)': electricityUnits + seedElec,
+                              'ประปา (ลบ.ม.)': waterUnits + seedWater,
+                            };
+                          });
+                        })()}
+                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorElec" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#09090b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                          labelStyle={{ color: '#ffffff', fontWeight: 'bold', fontSize: '11px' }}
+                          itemStyle={{ fontSize: '11px' }}
+                        />
+                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                        <Area type="monotone" dataKey="กระแสไฟฟ้า (หน่วย)" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorElec)" />
+                        <Area type="monotone" dataKey="ประปา (ลบ.ม.)" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={1} fill="url(#colorWater)" />
+                      </AreaChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -1016,7 +1195,7 @@ export default function AdminDashboard({
                   <h3 className="text-base font-bold text-white flex items-center gap-1.5">
                     <Activity className="w-4 h-4 text-brand-400" /> สัดส่วนสถานะห้องพัก
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">การจัดสรรและอัตราการเช่าของยูนิตทั้งหมด</p>
+                  <p className="text-xs text-slate-400 mt-0.5">การจัดสรรและอัตราการเช่าของยูนิตทั้งหมด (คลิกเพื่อจัดระเบียบข้อมูล)</p>
                 </div>
 
                 <div className="h-[140px] w-full flex items-center justify-center relative mt-2">
@@ -1054,22 +1233,52 @@ export default function AdminDashboard({
                 </div>
 
                 {/* Legends */}
-                <div className="grid grid-cols-3 gap-2 text-center text-[10px] mt-2 pt-3 border-t border-white/5">
-                  <div className="space-y-0.5">
+                <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] mt-2 pt-3 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('rooms');
+                      setRoomStatusFilter('Available');
+                      setFloorFilter('All');
+                      setRoomSearchText('');
+                    }}
+                    className="space-y-0.5 hover:bg-white/[0.04] p-1.5 rounded-xl transition-all cursor-pointer text-center"
+                    title="คลิกเพื่อคัดกรองห้องพักที่ว่าง"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block mr-1" />
                     <span className="text-slate-400 block font-light">ว่าง</span>
                     <strong className="text-emerald-400 font-bold block">{stats.availableCount} ยูนิต</strong>
-                  </div>
-                  <div className="space-y-0.5 border-x border-white/5">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('rooms');
+                      setRoomStatusFilter('Occupied');
+                      setFloorFilter('All');
+                      setRoomSearchText('');
+                    }}
+                    className="space-y-0.5 border-x border-white/5 hover:bg-white/[0.04] p-1.5 rounded-xl transition-all cursor-pointer text-center"
+                    title="คลิกเพื่อคัดกรองห้องพักที่มีผู้เช่า"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block mr-1" />
                     <span className="text-slate-400 block font-light">มีผู้เช่า</span>
                     <strong className="text-indigo-400 font-bold block">{stats.occupiedCount} ยูนิต</strong>
-                  </div>
-                  <div className="space-y-0.5">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('rooms');
+                      setRoomStatusFilter('Maintenance');
+                      setFloorFilter('All');
+                      setRoomSearchText('');
+                    }}
+                    className="space-y-0.5 hover:bg-white/[0.04] p-1.5 rounded-xl transition-all cursor-pointer text-center"
+                    title="คลิกเพื่อคัดกรองห้องพักที่ชำรุด"
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block mr-1" />
                     <span className="text-slate-400 block font-light">ปรับปรุง</span>
                     <strong className="text-amber-400 font-bold block">{stats.maintenanceCount} ยูนิต</strong>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1454,27 +1663,83 @@ export default function AdminDashboard({
               )}
             </AnimatePresence>
 
-            {/* UPGRADE 2: Floor Filter Tabs */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 mr-2 font-medium">🏢 ค้นหาตามชั้นอาคาร:</span>
-                <div className="flex bg-slate-900/80 p-0.5 rounded-xl border border-slate-800">
-                  {['All', 1, 2, 3].map((floor) => (
-                    <button
-                      key={floor}
-                      onClick={() => setFloorFilter(floor as any)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                        floorFilter === floor
-                          ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/10'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      {floor === 'All' ? 'ทั้งหมด (All)' : `ชั้น ${floor}`}
-                    </button>
-                  ))}
+            {/* UPGRADE 2: Floor Filter Tabs & Room Search Toolbar */}
+            <div className="bg-[#121216]/90 p-5 rounded-2xl border border-white/10 space-y-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {/* Search Input */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหาห้องพัก (เช่น '101', 'Deluxe', 'แอร์')..."
+                    value={roomSearchText}
+                    onChange={(e) => setRoomSearchText(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-white placeholder-slate-500"
+                  />
                 </div>
+                
+                {/* Status Dropdown */}
+                <div className="relative">
+                  <select
+                    value={roomStatusFilter}
+                    onChange={(e: any) => setRoomStatusFilter(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-slate-300 cursor-pointer"
+                  >
+                    <option value="All">ทุกสถานะ (All Status)</option>
+                    <option value="Available">ห้องว่าง (Available)</option>
+                    <option value="Occupied">มีผู้เช่าพัก (Occupied)</option>
+                    <option value="Maintenance">กำลังปรับปรุง (Maintenance)</option>
+                  </select>
+                </div>
+
+                {/* Clear Filters Button */}
+                {(roomSearchText || roomStatusFilter !== 'All' || floorFilter !== 'All') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRoomSearchText('');
+                      setRoomStatusFilter('All');
+                      setFloorFilter('All');
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs transition-colors cursor-pointer font-semibold border border-slate-700/50"
+                  >
+                    ล้างการคัดกรองทั้งหมด ✕
+                  </button>
+                )}
               </div>
-              <span className="text-xs text-slate-500">พบ {filteredRooms.length} ยูนิตห้องพัก</span>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-400 font-medium">🏢 ชั้นอาคาร:</span>
+                  <div className="flex bg-slate-900/80 p-0.5 rounded-xl border border-slate-800 flex-wrap">
+                    {(() => {
+                      // Generate dynamic list of floors from rooms
+                      const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor))).sort((a, b) => a - b);
+                      const floorsList = ['All', ...uniqueFloors];
+                      return floorsList.map((floor) => {
+                        const countInFloor = floor === 'All' 
+                          ? rooms.length 
+                          : rooms.filter(r => r.floor === floor).length;
+                        return (
+                          <button
+                            key={floor}
+                            type="button"
+                            onClick={() => setFloorFilter(floor as any)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                              floorFilter === floor
+                                ? 'bg-brand-500 text-slate-950 shadow-sm font-bold'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            {floor === 'All' ? `ทั้งหมด (${countInFloor})` : `ชั้น ${floor} (${countInFloor})`}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+                <span className="text-xs text-slate-500 font-mono">พบ {filteredRooms.length} ยูนิตห้องพัก</span>
+              </div>
             </div>
 
             {/* Room list Grid */}
@@ -2585,6 +2850,47 @@ export default function AdminDashboard({
                             </div>
 
                             <div className="flex items-center gap-1.5">
+                              {/* Slip Verification / Manual Status Toggle */}
+                              {inv.slipImage ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSlipInvoice(inv);
+                                    setSlipZoom(1);
+                                    setSlipRotation(0);
+                                  }}
+                                  title="ตรวจสอบภาพสลิปที่แนบมา"
+                                  className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1 border-0"
+                                >
+                                  📸 ตรวจสลิป
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onUpdateInvoices(invoices.map(item => {
+                                      if (item.id === inv.id) {
+                                        const newStatus = item.status === 'Paid' ? 'Unpaid' : 'Paid';
+                                        return {
+                                          ...item,
+                                          status: newStatus,
+                                          paidDate: newStatus === 'Paid' ? new Date().toISOString().split('T')[0] : undefined
+                                        };
+                                      }
+                                      return item;
+                                    }));
+                                  }}
+                                  title={inv.status === 'Paid' ? "เปลี่ยนสถานะเป็นค้างชำระ" : "เปลี่ยนสถานะเป็นรับชำระเงินแล้ว"}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border-0 ${
+                                    inv.status === 'Paid'
+                                      ? 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400'
+                                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400'
+                                  }`}
+                                >
+                                  {inv.status === 'Paid' ? '❌ ยกเลิกชำระ' : '✔️ รับชำระ'}
+                                </button>
+                              )}
+
                               {/* Copy Button */}
                               <button
                                 onClick={handleCopyText}
@@ -2716,6 +3022,83 @@ export default function AdminDashboard({
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* 1.5 Hero Banner Settings */}
+                <div className="bg-white/[0.02] border border-white/5 backdrop-blur-md rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl hover:border-white/10 transition-all duration-300">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white">ข้อความต้อนรับหน้าผู้เช่า (Hero Banner)</h3>
+                        <p className="text-xs text-slate-500">ปรับแก้ไขหัวข้อ คำอธิบาย หรือปิด/เปิดการแสดงผลบนหน้าแรก</p>
+                      </div>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={settings.showHeroSection ?? true}
+                        onChange={(e) => onUpdateSettings({ ...settings, showHeroSection: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-12 h-6.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-white shadow-inner"></div>
+                    </label>
+                  </div>
+
+                  {(settings.showHeroSection ?? true) && (
+                    <div className="space-y-5 pt-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-slate-300">หัวข้อหลัก (Title)</label>
+                          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={settings.showHeroTitle ?? true}
+                              onChange={(e) => onUpdateSettings({ ...settings, showHeroTitle: e.target.checked })}
+                              className="rounded bg-[#0a0a0f] border-white/10 text-amber-500 focus:ring-0"
+                            />
+                            <span>แสดงหัวข้อหลัก</span>
+                          </label>
+                        </div>
+                        <input
+                          id="settings-hero-title"
+                          type="text"
+                          value={settings.heroTitle ?? 'สัมผัสประสบการณ์การพักผ่อน'}
+                          onChange={(e) => onUpdateSettings({ ...settings, heroTitle: e.target.value })}
+                          placeholder="สัมผัสประสบการณ์การพักผ่อน"
+                          disabled={!(settings.showHeroTitle ?? true)}
+                          className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all duration-300 disabled:opacity-50"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-slate-300">คำอธิบายใต้หัวข้อ (Subtitle)</label>
+                          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={settings.showHeroSubtitle ?? true}
+                              onChange={(e) => onUpdateSettings({ ...settings, showHeroSubtitle: e.target.checked })}
+                              className="rounded bg-[#0a0a0f] border-white/10 text-amber-500 focus:ring-0"
+                            />
+                            <span>แสดงคำอธิบาย</span>
+                          </label>
+                        </div>
+                        <textarea
+                          id="settings-hero-subtitle"
+                          rows={3}
+                          value={settings.heroSubtitle ?? 'บริการห้องพักรายวันสุดหรู และรายเดือนดีไซน์พรีเมียม พร้อมระบบบริหารจัดการค่าน้ำค่าไฟหลังบ้านที่โปร่งใส ตรวจสอบได้ทุกยูนิต'}
+                          onChange={(e) => onUpdateSettings({ ...settings, heroSubtitle: e.target.value })}
+                          placeholder="บริการห้องพักรายวันสุดหรู..."
+                          disabled={!(settings.showHeroSubtitle ?? true)}
+                          className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 transition-all duration-300 disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. LINE Notifications Setup */}
@@ -2955,17 +3338,57 @@ export default function AdminDashboard({
                         className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-300 block">อัตราการเก็บมัดจำจองห้องพัก</label>
-                      <select
-                        id="settings-deposit-multiplier"
-                        value={settings.securityDepositMultiplier}
-                        onChange={(e) => onUpdateSettings({ ...settings, securityDepositMultiplier: Number(e.target.value) })}
-                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all duration-300 text-white cursor-pointer"
-                      >
-                        <option value={1}>มัดจำ 1 เดือน (เท่ากับอัตราค่าเช่า)</option>
-                        <option value={2}>มัดจำ 2 เดือน (สัญญาความปลอดภัยสูง)</option>
-                      </select>
+                    <div className="space-y-3 col-span-1 md:col-span-2 bg-[#0a0a0f]/60 p-4 rounded-xl border border-white/5">
+                      <label className="text-xs font-semibold text-slate-300 block">รูปแบบการจัดเก็บเงินมัดจำ (Admin Only)</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] text-slate-400 block mb-1">ประเภทการคิดมัดจำ</label>
+                          <select
+                            id="settings-deposit-type"
+                            value={settings.depositType || 'multiplier'}
+                            onChange={(e) => onUpdateSettings({ ...settings, depositType: e.target.value as 'multiplier' | 'fixed' })}
+                            className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 text-white cursor-pointer"
+                          >
+                            <option value="multiplier">คำนวณตามจำนวนเดือนค่าเช่า</option>
+                            <option value="fixed">ระบุจำนวนเงินมัดจำคงที่ (บาท)</option>
+                          </select>
+                        </div>
+
+                        {(settings.depositType || 'multiplier') === 'multiplier' ? (
+                          <div>
+                            <label className="text-[11px] text-slate-400 block mb-1">อัตรามัดจำ (เท่าของค่าเช่ารายเดือน)</label>
+                            <select
+                              id="settings-deposit-multiplier"
+                              value={settings.securityDepositMultiplier}
+                              onChange={(e) => onUpdateSettings({ ...settings, securityDepositMultiplier: Number(e.target.value) })}
+                              className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 text-white cursor-pointer"
+                            >
+                              <option value={0}>ไม่มีค่ามัดจำ (0 บาท)</option>
+                              <option value={0.5}>มัดจำ 0.5 เดือน (ครึ่งเดือน)</option>
+                              <option value={1}>มัดจำ 1 เดือน (เท่ากับค่าเช่า)</option>
+                              <option value={1.5}>มัดจำ 1.5 เดือน</option>
+                              <option value={2}>มัดจำ 2 เดือน</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="text-[11px] text-slate-400 block mb-1">จำนวนเงินมัดจำคงที่ (บาท)</label>
+                            <input
+                              id="settings-custom-fixed-deposit"
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={settings.customFixedDeposit ?? 3500}
+                              onChange={(e) => onUpdateSettings({ ...settings, customFixedDeposit: Math.max(0, Number(e.target.value)) })}
+                              className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 text-white font-bold"
+                              placeholder="3500"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        * ลูกค้าในหน้าจองจะไม่สามารถแก้ไขยอดเงินมัดจำเองได้ ระบบจะคำนวณตามการตั้งค่าส่วนนี้ของแอดมินเท่านั้น
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -3199,10 +3622,102 @@ export default function AdminDashboard({
                 <p className="text-slate-400 text-sm mt-1">รับเรื่องร้องเรียน ตรวจสอบภาพถ่ายประสานงาน และตอบกลับสถานะผู้เช่าพร้อมส่งอัปเดตไป LINE API</p>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleExportTicketsToCSV}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-all border border-slate-700/60 flex items-center gap-2 cursor-pointer shadow-sm"
+                  title="ดาวน์โหลดรายการแจ้งซ่อมทั้งหมดเป็นไฟล์ CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-400" /> ส่งออกเป็น CSV
+                </button>
                 <span className="bg-amber-500/10 border border-amber-500/20 text-amber-300 font-bold text-xs px-3 py-1.5 rounded-xl">
                   เรื่องรอแก้ไข {tickets.filter(t => t.status !== 'Resolved').length} รายการ
                 </span>
               </div>
+            </div>
+
+            {/* Maintenance Filters Toolbar */}
+            <div className="bg-[#121216]/90 p-5 rounded-2xl border border-white/10 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="ค้นหา (เลขห้อง, ชื่อ, รายละเอียด)..."
+                    value={ticketSearchText}
+                    onChange={(e) => setTicketSearchText(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-white placeholder-slate-500"
+                  />
+                </div>
+
+                {/* Urgency */}
+                <div>
+                  <select
+                    value={ticketUrgencyFilter}
+                    onChange={(e: any) => setTicketUrgencyFilter(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-slate-300 cursor-pointer"
+                  >
+                    <option value="All">ทุกระดับความเร่งด่วน (All Urgency)</option>
+                    <option value="high">🔴 ด่วนมาก (High)</option>
+                    <option value="medium">🟡 ปานกลาง (Medium)</option>
+                    <option value="low">🟢 ต่ำ (Low)</option>
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <select
+                    value={ticketStatusFilter}
+                    onChange={(e: any) => setTicketStatusFilter(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-slate-300 cursor-pointer"
+                  >
+                    <option value="All">ทุกสถานะดำเนินงาน (All Status)</option>
+                    <option value="Pending">🕒 รอตรวจสอบ (Pending)</option>
+                    <option value="In Progress">🛠️ กำลังดำเนินการ (In Progress)</option>
+                    <option value="Resolved">✅ สำเร็จแล้ว (Resolved)</option>
+                  </select>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <select
+                    value={ticketCategoryFilter}
+                    onChange={(e: any) => setTicketCategoryFilter(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-brand-500 text-slate-300 cursor-pointer"
+                  >
+                    <option value="All">ทุกหมวดหมู่ (All Category)</option>
+                    <option value="aircon">💨 เครื่องปรับอากาศ (Aircon)</option>
+                    <option value="plumbing">💧 ท่อน้ำ/สุขภัณฑ์ (Plumbing)</option>
+                    <option value="electricity">🔌 อุปกรณ์ไฟฟ้า (Electricity)</option>
+                    <option value="furniture">🛋️ เฟอร์นิเจอร์ (Furniture)</option>
+                    <option value="other">📦 อื่นๆ (Other)</option>
+                  </select>
+                </div>
+              </div>
+
+              {(ticketSearchText || ticketUrgencyFilter !== 'All' || ticketStatusFilter !== 'All' || ticketCategoryFilter !== 'All') && (
+                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  <span className="text-xs text-slate-400">
+                    กำลังคัดกรอง: {ticketSearchText ? `"${ticketSearchText}" ` : ''} 
+                    {ticketUrgencyFilter !== 'All' ? `ด่วน-${ticketUrgencyFilter} ` : ''}
+                    {ticketStatusFilter !== 'All' ? `สถานะ-${ticketStatusFilter} ` : ''}
+                    {ticketCategoryFilter !== 'All' ? `หมวดหมู่-${ticketCategoryFilter} ` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTicketSearchText('');
+                      setTicketUrgencyFilter('All');
+                      setTicketStatusFilter('All');
+                      setTicketCategoryFilter('All');
+                    }}
+                    className="text-xs text-brand-400 hover:text-brand-300 cursor-pointer font-semibold"
+                  >
+                    ล้างการคัดกรองทั้งหมด ✕
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Tickets Table / List Layout */}
@@ -3219,12 +3734,30 @@ export default function AdminDashboard({
                   <div className="bg-[#121216]/90 rounded-3xl border border-white/10 overflow-hidden shadow-2xl">
                     <div className="px-6 py-5 border-b border-white/10 bg-[#0a0a0c]/60 flex justify-between items-center">
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <span>📋 รายการร้องเรียนทั้งหมด ({tickets.length} เรื่อง)</span>
+                        <span>📋 รายการร้องเรียนคัดกรอง ({filteredTickets.length} จาก {tickets.length} เรื่อง)</span>
                       </h3>
                     </div>
 
                     <div className="divide-y divide-white/5 max-h-[70vh] overflow-y-auto">
-                      {tickets.slice().reverse().map((tc) => {
+                      {filteredTickets.length === 0 ? (
+                        <div className="p-12 text-center text-slate-500">
+                          <Search className="w-10 h-10 mx-auto text-slate-700 mb-2" />
+                          <p className="text-sm font-semibold text-slate-400">ไม่พบรายการแจ้งซ่อมตามการคัดกรองนี้</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTicketSearchText('');
+                              setTicketUrgencyFilter('All');
+                              setTicketStatusFilter('All');
+                              setTicketCategoryFilter('All');
+                            }}
+                            className="mt-3 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                          >
+                            รีเซ็ตตัวกรองทั้งหมด
+                          </button>
+                        </div>
+                      ) : (
+                        filteredTickets.slice().reverse().map((tc) => {
                         return (
                           <div
                             key={tc.id}
@@ -3356,7 +3889,7 @@ export default function AdminDashboard({
                             </div>
                           </div>
                         );
-                      })}
+                      }))}
                     </div>
                   </div>
                 </div>
@@ -3627,6 +4160,222 @@ export default function AdminDashboard({
                     <button
                       type="button"
                       onClick={() => setSelectedSlipBooking(null)}
+                      className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      ปิดหน้าจอตรวจสอบ
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* UPGRADE 4: Interactive Invoice Slip Verification Modal Overlay */}
+        <AnimatePresence>
+          {selectedSlipInvoice && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#030304]/90 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-[#0b0b0e] border border-white/10 rounded-3xl w-full max-w-4xl h-[85vh] flex flex-col md:flex-row overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.8)]"
+              >
+                {/* Left side: Slip image Interactive Viewer Canvas */}
+                <div className="flex-1 bg-[#050507] p-6 flex flex-col relative border-b md:border-b-0 md:border-r border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xxs font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-lg">Interactive Invoice Slip Canvas</span>
+                    
+                    {/* Controls Row */}
+                    <div className="flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setSlipZoom(prev => Math.max(0.5, prev - 0.25))}
+                        className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors text-xs cursor-pointer"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSlipZoom(1)}
+                        className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors text-[10px] px-2 font-bold cursor-pointer"
+                        title="Reset Zoom"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSlipZoom(prev => Math.min(3, prev + 0.25))}
+                        className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors text-xs cursor-pointer"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="w-px h-4 bg-white/10 mx-1" />
+                      <button
+                        type="button"
+                        onClick={() => setSlipRotation(prev => prev - 90)}
+                        className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors text-xs cursor-pointer"
+                        title="Rotate Counter-Clockwise"
+                      >
+                        ↺
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSlipRotation(prev => prev + 90)}
+                        className="p-1.5 hover:bg-slate-800 text-slate-300 hover:text-white rounded transition-colors text-xs cursor-pointer"
+                        title="Rotate Clockwise"
+                      >
+                        ↻
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Canvas Stage */}
+                  <div className="flex-1 relative rounded-2xl bg-black/40 border border-white/5 overflow-hidden flex items-center justify-center">
+                    <div className="absolute top-2.5 right-2.5 z-10 text-[10px] bg-black/60 text-slate-400 px-2 py-1 rounded-md font-mono">
+                      Scale: {Math.round(slipZoom * 100)}% | Rotation: {slipRotation}°
+                    </div>
+                    
+                    <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
+                      {selectedSlipInvoice.slipImage ? (
+                        <img
+                          id="modal-invoice-slip-image"
+                          src={selectedSlipInvoice.slipImage}
+                          alt="สลิปโอนเงิน"
+                          className="max-h-full max-w-full object-contain shadow-2xl transition-all duration-300 select-none pointer-events-none"
+                          style={{
+                            transform: `scale(${slipZoom}) rotate(${slipRotation}deg)`
+                          }}
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="text-slate-500 text-xs">ไม่มีสลิปชำระเงินแนบมา</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right side: Verification form and status controls */}
+                <div className="w-full md:w-80 bg-[#0d0d12] p-6 flex flex-col justify-between overflow-y-auto">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-white">🔍 ตรวจสอบสลิปน้ำ-ไฟ</h3>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSlipInvoice(null)}
+                        className="w-7 h-7 flex items-center justify-center bg-slate-900 border border-white/5 text-slate-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Metadata Card */}
+                    <div className="bg-[#121216]/90 border border-white/5 p-4 rounded-xl space-y-3.5">
+                      <div>
+                        <span className="text-xxs text-slate-500 uppercase font-mono block">รอบบิลค่าน้ำค่าไฟ</span>
+                        <span className="text-sm font-bold text-white block mt-0.5">ห้อง {selectedSlipInvoice.roomNumber}</span>
+                        <span className="text-xxs text-slate-400 font-mono block mt-0.5">ประจำงวด: {selectedSlipInvoice.billingMonth}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-xxs text-slate-500 uppercase font-mono block">ค่าไฟฟ้า</span>
+                          <span className="text-xs font-bold text-white block mt-0.5">฿{selectedSlipInvoice.electricityCost.toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-xxs text-slate-500 uppercase font-mono block">ค่าน้ำประปา</span>
+                          <span className="text-xs font-bold text-white block mt-0.5">฿{selectedSlipInvoice.waterCost.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="h-px bg-white/5" />
+
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">ค่าส่วนกลางโครงการ:</span>
+                          <span className="font-bold text-white">฿{selectedSlipInvoice.commonFee.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">ยอดเงินรวม:</span>
+                          <span className="font-bold text-brand-400 text-sm">฿{selectedSlipInvoice.totalCost.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Check list */}
+                    <div className="space-y-2.5">
+                      <h4 className="text-xxs text-slate-400 font-bold uppercase tracking-wider">📋 เช็คความถูกต้องสลิป</h4>
+                      <div className="space-y-2">
+                        {[
+                          `ยอดโอนตรงตามยอดใบแจ้งหนี้ ฿${selectedSlipInvoice.totalCost.toLocaleString()}`,
+                          'วันที่-เวลาทำรายการตรงตามจริง',
+                          'มีสัญลักษณ์ยืนยันการโอนสำเร็จ',
+                          'ชื่อผู้รับเงินถูกต้อง'
+                        ].map((label, index) => (
+                          <label key={index} className="flex items-start gap-2 text-xxs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              defaultChecked
+                              className="w-3.5 h-3.5 rounded bg-slate-900 border-white/10 text-brand-500 focus:ring-0 mt-0.5 cursor-pointer"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="pt-4 border-t border-white/5 space-y-2">
+                    {selectedSlipInvoice.status === 'Unpaid' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Approve Slip & Update Invoices status
+                          onUpdateInvoices(invoices.map(inv => {
+                            if (inv.id === selectedSlipInvoice.id) {
+                              return {
+                                ...inv,
+                                status: 'Paid',
+                                paidDate: new Date().toISOString().split('T')[0]
+                              };
+                            }
+                            return inv;
+                          }));
+                          setSelectedSlipInvoice(null);
+                        }}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-emerald-500/10 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        ✅ อนุมัติสลิป & ทำรายการรับเงิน
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Reject / Cancel Payment Status
+                          onUpdateInvoices(invoices.map(inv => {
+                            if (inv.id === selectedSlipInvoice.id) {
+                              return {
+                                ...inv,
+                                status: 'Unpaid',
+                                paidDate: undefined
+                              };
+                            }
+                            return inv;
+                          }));
+                          setSelectedSlipInvoice(null);
+                        }}
+                        className="w-full py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        ❌ ปรับเป็นค้างชำระ (Unpaid)
+                      </button>
+                    )}
+                    
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSlipInvoice(null)}
                       className="w-full py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 font-bold text-xs rounded-xl transition-all cursor-pointer"
                     >
                       ปิดหน้าจอตรวจสอบ

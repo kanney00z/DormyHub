@@ -50,6 +50,7 @@ export interface UtilityInvoice {
   status: 'Unpaid' | 'Paid';
   issueDate: string;
   paidDate?: string;
+  slipImage?: string;
 }
 
 export interface SystemSettings {
@@ -57,7 +58,14 @@ export interface SystemSettings {
   waterUnitRate: number;       // e.g. 18 Baht/unit
   commonFee: number;          // e.g. 300 Baht/month
   securityDepositMultiplier: number; // e.g. 1 (1 month rent deposit)
+  depositType?: 'multiplier' | 'fixed'; // 'multiplier' or 'fixed'
+  customFixedDeposit?: number; // Fixed deposit amount set by admin
   propertyName?: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
+  showHeroTitle?: boolean;
+  showHeroSubtitle?: boolean;
+  showHeroSection?: boolean;
   promptPayNumber?: string;
   lineNotificationEnabled?: boolean;
   lineTokenType?: 'Notify' | 'MessagingApi';

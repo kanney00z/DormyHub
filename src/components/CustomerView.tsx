@@ -128,7 +128,9 @@ export default function CustomerView({
     } else {
       // Monthly
       const baseRent = selectedRoom.monthlyPrice * monthlyMonths;
-      const deposit = selectedRoom.monthlyPrice * settings.securityDepositMultiplier;
+      const deposit = settings.depositType === 'fixed'
+        ? (settings.customFixedDeposit ?? 3500)
+        : selectedRoom.monthlyPrice * (settings.securityDepositMultiplier || 1);
       const common = settings.commonFee * monthlyMonths;
       const grandTotal = baseRent + deposit + common;
       return {
@@ -221,7 +223,9 @@ export default function CustomerView({
     }, 1200);
   };
 
-  const handleStartSlipScan = (inv: UtilityInvoice) => {
+  const handleStartSlipScan = (inv: UtilityInvoice, customSlip?: string) => {
+    const slipToUse = customSlip || 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?auto=format&fit=crop&w=800&q=80';
+    setUploadedSlipFile(slipToUse);
     setActiveSlipInvoice(inv);
     setScanningSlip(true);
     setScanProgress(0);
@@ -250,7 +254,8 @@ export default function CustomerView({
               return {
                 ...i,
                 status: 'Paid' as const,
-                paidDate: new Date().toISOString().split('T')[0]
+                paidDate: new Date().toISOString().split('T')[0],
+                slipImage: slipToUse
               };
             }
             return i;
@@ -354,38 +359,44 @@ export default function CustomerView({
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent" />
         </div>
         
-        <div className="relative z-10 text-center max-w-4xl px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="inline-flex items-center gap-2 bg-brand-400/20 text-brand-300 border border-brand-400/30 px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm"
-          >
-            <Sparkles className="w-4 h-4 text-brand-300" />
-            <span className="text-xs md:text-sm font-medium tracking-wide">Boutique & Premium Residences</span>
-          </motion.div>
-          
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1 }}
-            className="text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight"
-          >
-            สัมผัสประสบการณ์การพักผ่อน <br className="hidden md:inline" />
-            <span className="bg-gradient-to-r from-brand-300 via-brand-200 to-amber-100 bg-clip-text text-transparent inline-block">
-              ที่เหนือระดับกับ {settings.propertyName || 'DormyHub'}
-            </span>
-          </motion.h1>
-          
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto font-light leading-relaxed"
-          >
-            บริการห้องพักรายวันสุดหรู และรายเดือนดีไซน์พรีเมียม พร้อมระบบบริหารจัดการค่าน้ำค่าไฟหลังบ้านที่โปร่งใส ตรวจสอบได้ทุกยูนิต
-          </motion.p>
-        </div>
+        {(settings.showHeroSection ?? true) && (
+          <div className="relative z-10 text-center max-w-4xl px-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="inline-flex items-center gap-2 bg-brand-400/20 text-brand-300 border border-brand-400/30 px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm"
+            >
+              <Sparkles className="w-4 h-4 text-brand-300" />
+              <span className="text-xs md:text-sm font-medium tracking-wide">Boutique & Premium Residences</span>
+            </motion.div>
+            
+            {(settings.showHeroTitle ?? true) && (
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.1 }}
+                className="text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight"
+              >
+                {settings.heroTitle ?? 'สัมผัสประสบการณ์การพักผ่อน'} <br className="hidden md:inline" />
+                <span className="bg-gradient-to-r from-brand-300 via-brand-200 to-amber-100 bg-clip-text text-transparent inline-block">
+                  ที่เหนือระดับกับ {settings.propertyName || 'DormyHub'}
+                </span>
+              </motion.h1>
+            )}
+            
+            {(settings.showHeroSubtitle ?? true) && (
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                className="mt-6 text-lg text-slate-300 max-w-2xl mx-auto font-light leading-relaxed"
+              >
+                {settings.heroSubtitle ?? 'บริการห้องพักรายวันสุดหรู และรายเดือนดีไซน์พรีเมียม พร้อมระบบบริหารจัดการค่าน้ำค่าไฟหลังบ้านที่โปร่งใส ตรวจสอบได้ทุกยูนิต'}
+              </motion.p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Main Container */}
@@ -1017,8 +1028,15 @@ export default function CustomerView({
                           <span className="font-bold text-white">฿{calculation.subtotal.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-slate-400">
-                          <span>ค่ามัดจำล่วงหน้า (คืนเงินวันเช็คเอาท์)</span>
-                          <span className="font-bold text-slate-200">฿{calculation.deposit.toLocaleString()}</span>
+                          <div className="flex flex-col">
+                            <span className="text-slate-300">ค่ามัดจำล่วงหน้า (คืนเงินวันเช็คเอาท์)</span>
+                            <span className="text-[11px] text-slate-500 font-mono">
+                              {settings.depositType === 'fixed'
+                                ? '(ยอดมัดจำคงที่จากระบบ)'
+                                : `(อัตรามัดจำ ${settings.securityDepositMultiplier || 1} เดือน)`}
+                            </span>
+                          </div>
+                          <span className="font-bold text-slate-200 text-base">฿{calculation.deposit.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center text-sm text-slate-400">
                           <span>ค่าบริการส่วนกลาง ({monthlyMonths} เดือน)</span>
@@ -1369,7 +1387,12 @@ export default function CustomerView({
                                           className="hidden"
                                           onChange={(e) => {
                                             if (e.target.files && e.target.files[0]) {
-                                              handleStartSlipScan(inv);
+                                              const file = e.target.files[0];
+                                              const reader = new FileReader();
+                                              reader.onloadend = () => {
+                                                handleStartSlipScan(inv, reader.result as string);
+                                              };
+                                              reader.readAsDataURL(file);
                                             }
                                           }}
                                         />
