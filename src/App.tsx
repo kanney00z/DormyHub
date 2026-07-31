@@ -128,9 +128,32 @@ export default function App() {
     }
   };
 
-  // Sync with built-in Server DB and Supabase on mount and poll every 3 seconds for live updates
+  // Sync with built-in Server DB and Supabase on mount and poll every 1.2s for live real-time updates across devices
   useEffect(() => {
     let isMounted = true;
+
+    // Cross-tab channel for instant sync across tabs on same device
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('dormy_realtime_tab_sync');
+        bc.onmessage = (event) => {
+          if (event.data && event.data.type === 'STATE_UPDATED' && isMounted) {
+            const { db } = event.data;
+            if (db && db.lastUpdated && db.lastUpdated > lastUpdatedRef.current) {
+              lastUpdatedRef.current = db.lastUpdated;
+              isRemoteSyncRef.current = true;
+              if (db.rooms) setRooms(db.rooms);
+              if (db.bookings) setBookings(db.bookings);
+              if (db.invoices) setInvoices(db.invoices);
+              if (db.tickets) setTickets(db.tickets);
+              if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
+              setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
+            }
+          }
+        };
+      } catch (e) {}
+    }
 
     async function syncWithServerDb() {
       const db = await fetchServerDb();
@@ -149,7 +172,7 @@ export default function App() {
             supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
             supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
           }));
-          setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+          setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
         }
       }
       if (isMounted && !isInitialFetchDoneRef.current) {
@@ -160,10 +183,10 @@ export default function App() {
     // Initial fetch from server DB
     syncWithServerDb();
 
-    // Poll server DB every 3 seconds so any new booking/update from another device instantly appears
+    // Poll server DB every 1.2 seconds so any new booking/update from another device or machine instantly appears
     const pollInterval = setInterval(() => {
       syncWithServerDb();
-    }, 3000);
+    }, 1200);
 
     // Initial Sync from Supabase if credentials are configured
     async function loadFromSupabase() {
@@ -181,7 +204,7 @@ export default function App() {
           supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
           supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
         }));
-        setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+        setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
       }
     }
     loadFromSupabase();
@@ -210,7 +233,7 @@ export default function App() {
                 supabaseUrl: newData.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
                 supabaseAnonKey: newData.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
               }));
-              setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+              setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
             }
           }
         )
@@ -220,6 +243,7 @@ export default function App() {
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
+      if (bc) bc.close();
       if (client && channel) {
         client.removeChannel(channel);
       }
@@ -239,8 +263,21 @@ export default function App() {
     if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-      saveTimeoutRef.current = setTimeout(() => {
-        saveServerDb({ rooms, bookings, invoices, tickets, settings });
+      saveTimeoutRef.current = setTimeout(async () => {
+        const res = await saveServerDb({ rooms, bookings, invoices, tickets, settings });
+        if (res.lastUpdated) {
+          lastUpdatedRef.current = res.lastUpdated;
+          if (typeof BroadcastChannel !== 'undefined') {
+            try {
+              const bc = new BroadcastChannel('dormy_realtime_tab_sync');
+              bc.postMessage({
+                type: 'STATE_UPDATED',
+                db: { rooms, bookings, invoices, tickets, settings, lastUpdated: res.lastUpdated }
+              });
+              bc.close();
+            } catch (e) {}
+          }
+        }
         saveSupabaseState('rooms', rooms, settings);
         saveSupabaseState('bookings', bookings, settings);
         saveSupabaseState('invoices', invoices, settings);

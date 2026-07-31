@@ -24,16 +24,18 @@ export async function fetchServerDb(): Promise<ServerDbState | null> {
   }
 }
 
-export async function saveServerDb(payload: Partial<ServerDbState>): Promise<boolean> {
+export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
     const res = await fetch('/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    return res.ok;
+    if (!res.ok) return { success: false };
+    const data = await res.json();
+    return { success: true, lastUpdated: data.lastUpdated };
   } catch {
-    return false;
+    return { success: false };
   }
 }
 
