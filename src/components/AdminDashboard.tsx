@@ -5,7 +5,7 @@ import {
   Trash2, FileText, Check, Clock, TrendingUp, AlertTriangle, 
   Home, ClipboardList, CreditCard, ChevronRight, CheckCircle2, DollarSign, Edit3, X, HelpCircle,
   Upload, Image as ImageIcon, Bell, Send, AlertCircle, Calendar, ChevronLeft, Wrench, Sparkles,
-  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity, ZoomIn, ZoomOut
+  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity, ZoomIn, ZoomOut, Database
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, AreaChart, Area
@@ -2018,16 +2018,16 @@ export default function AdminDashboard({
 
                 <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[850px]">
                       <thead>
-                        <tr className="border-b border-slate-800 bg-slate-950/40 text-slate-400 text-xs font-semibold tracking-wider uppercase">
-                          <th className="p-4">ผู้เข้าพัก</th>
-                          <th className="p-4">ห้องพัก</th>
-                          <th className="p-4">รูปแบบ</th>
-                          <th className="p-4">ช่วงเวลาเข้าอยู่</th>
-                          <th className="p-4">ยอดเงิน</th>
-                          <th className="p-4">สถานะ</th>
-                          <th className="p-4 text-right">ดำเนินการ</th>
+                        <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400 text-xs font-semibold tracking-wider uppercase">
+                          <th className="p-4 whitespace-nowrap">ผู้เข้าพัก</th>
+                          <th className="p-4 whitespace-nowrap">ห้องพัก</th>
+                          <th className="p-4 whitespace-nowrap">รูปแบบ</th>
+                          <th className="p-4 whitespace-nowrap">ช่วงเวลาเข้าอยู่</th>
+                          <th className="p-4 whitespace-nowrap">ยอดเงิน</th>
+                          <th className="p-4 whitespace-nowrap">สถานะ</th>
+                          <th className="p-4 text-right whitespace-nowrap">ดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50 text-sm">
@@ -2040,13 +2040,13 @@ export default function AdminDashboard({
                         ) : (
                           filteredBookings.map((book) => (
                           <tr key={book.id} className="hover:bg-slate-900/30 transition-colors">
-                            <td className="p-4">
-                              <div className="font-bold text-white">{book.guestName}</div>
-                              <div className="text-xxs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                            <td className="p-4 align-middle">
+                              <div className="font-bold text-white text-base">{book.guestName}</div>
+                              <div className="text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                 <span>📞 {book.guestPhone}</span>
                                 <span>✉️ {book.guestEmail}</span>
                                 {book.guestLine && (
-                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1 py-0.5 rounded text-[10px] font-mono inline-block">
+                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px] font-mono inline-block">
                                     💬 LINE: {book.guestLine}
                                   </span>
                                 )}
@@ -2067,17 +2067,17 @@ export default function AdminDashboard({
                                       setSlipZoom(1);
                                       setSlipRotation(0);
                                     }}
-                                    className="text-[9px] text-brand-400 hover:text-brand-300 font-semibold underline flex items-center gap-0.5 cursor-pointer ml-1 bg-transparent border-0"
+                                    className="text-[10px] text-brand-400 hover:text-brand-300 font-semibold underline flex items-center gap-0.5 cursor-pointer ml-1 bg-transparent border-0"
                                   >
                                     📄 ตรวจสอบสลิปโอนเงิน
                                   </button>
                                 )}
                               </div>
                             </td>
-                            <td className="p-4">
-                              <span className="font-bold text-white">ห้อง {book.roomNumber}</span>
+                            <td className="p-4 align-middle whitespace-nowrap">
+                              <span className="font-bold text-white text-sm bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">ห้อง {book.roomNumber}</span>
                             </td>
-                            <td className="p-4">
+                            <td className="p-4 align-middle whitespace-nowrap">
                               <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                                 book.bookingType === 'daily' 
                                   ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' 
@@ -2086,18 +2086,18 @@ export default function AdminDashboard({
                                 {book.bookingType === 'daily' ? 'รายวัน' : 'รายเดือน'}
                               </span>
                             </td>
-                            <td className="p-4 text-xs">
-                              <div className="text-slate-300">เข้า: {book.checkInDate}</div>
-                              <div className="text-slate-500 mt-0.5">ออก: {book.checkOutDate}</div>
+                            <td className="p-4 align-middle text-xs whitespace-nowrap">
+                              <div className="text-slate-200 font-medium">เข้า: {book.checkInDate}</div>
+                              <div className="text-slate-400 mt-0.5">ออก: {book.checkOutDate}</div>
                             </td>
-                            <td className="p-4">
-                              <span className="font-bold text-slate-200">฿{book.totalPrice.toLocaleString()}</span>
+                            <td className="p-4 align-middle whitespace-nowrap">
+                              <span className="font-bold text-slate-100 text-sm">฿{book.totalPrice.toLocaleString()}</span>
                               {book.depositPaid > 0 && (
-                                <div className="text-xxs text-emerald-400 mt-0.5">ประกันตัว: ฿{book.depositPaid}</div>
+                                <div className="text-[11px] text-emerald-400 mt-0.5 font-medium">ประกันตัว: ฿{book.depositPaid.toLocaleString()}</div>
                               )}
                             </td>
-                            <td className="p-4">
-                              <span className={`inline-block text-xxs px-2 py-0.5 rounded-full font-semibold ${
+                            <td className="p-4 align-middle whitespace-nowrap">
+                              <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold whitespace-nowrap ${
                                 book.status === 'Active' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' :
                                 book.status === 'CheckedOut' ? 'bg-slate-800 text-slate-400 border border-slate-700' :
                                 book.status === 'Pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25' :
@@ -2108,8 +2108,8 @@ export default function AdminDashboard({
                                  book.status === 'Pending' ? 'รอเช็คอิน' : 'ยกเลิก'}
                               </span>
                             </td>
-                            <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                            <td className="p-4 align-middle text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2 flex-nowrap">
                                 {book.status === 'Pending' && (
                                   <>
                                     <button
@@ -3390,6 +3390,82 @@ export default function AdminDashboard({
                         * ลูกค้าในหน้าจองจะไม่สามารถแก้ไขยอดเงินมัดจำเองได้ ระบบจะคำนวณตามการตั้งค่าส่วนนี้ของแอดมินเท่านั้น
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                {/* SUPABASE REAL-TIME DATABASE SYNC PANEL */}
+                <div className="bg-[#12121a] rounded-2xl p-6 border border-emerald-500/20 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                          เชื่อมต่อ Supabase Database (ซิงค์ข้ามเครื่อง Real-time)
+                          {settings.supabaseUrl && settings.supabaseAnonKey ? (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
+                              ● พร้อมใช้งาน
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
+                              ○ โหมด LocalStorage
+                            </span>
+                          )}
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          เมื่อใส่ URL และ Anon Key ข้อมูลการจอง ยูนิต และบิลจะแสดงผลเหมือนกันทุกเครื่องแบบ Real-time
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 block">
+                        Supabase Project URL
+                      </label>
+                      <input
+                        id="settings-supabase-url"
+                        type="text"
+                        value={settings.supabaseUrl || ''}
+                        onChange={(e) => onUpdateSettings({ ...settings, supabaseUrl: e.target.value })}
+                        placeholder="https://xyzcompany.supabase.co"
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-300 block">
+                        Supabase Anon Key (API Key)
+                      </label>
+                      <input
+                        id="settings-supabase-key"
+                        type="password"
+                        value={settings.supabaseAnonKey || ''}
+                        onChange={(e) => onUpdateSettings({ ...settings, supabaseAnonKey: e.target.value })}
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        className="w-full bg-[#0a0a0f] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-[#0a0a0f]/80 p-3.5 rounded-xl border border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="text-slate-400">
+                      💡 <strong className="text-white">คำแนะนำการติดตั้งใน Supabase:</strong> คัดลอกโค้ด SQL ด้านขวา แล้วไปวางที่เมนู <span className="text-emerald-400">SQL Editor</span> ใน Supabase เพื่อสร้างตารางอัตโนมัติ
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        import('../lib/supabase').then((mod) => {
+                          navigator.clipboard.writeText(mod.SUPABASE_SQL_SETUP);
+                          alert('คัดลอก SQL คำสั่งสร้างตารางเรียบร้อยแล้ว! นำไปรันใน SQL Editor บน Supabase ได้เลยครับ');
+                        });
+                      }}
+                      className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-semibold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 text-xs"
+                    >
+                      📋 คัดลอก SQL Setup
+                    </button>
                   </div>
                 </div>
 

@@ -72,6 +72,8 @@ export interface SystemSettings {
   lineNotifyToken?: string;
   lineChannelAccessToken?: string;
   lineUserId?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 export interface MaintenanceTicket {

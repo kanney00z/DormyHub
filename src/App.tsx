@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Building, User, Shield, HelpCircle, FileText, Sparkles, Key, Check, Info, AlertTriangle, Trash2, X
@@ -8,6 +8,7 @@ import { INITIAL_ROOMS, INITIAL_BOOKINGS, INITIAL_INVOICES, DEFAULT_SETTINGS, IN
 import CustomerView from './components/CustomerView';
 import AdminDashboard from './components/AdminDashboard';
 import { sendLineNotification } from './utils/line';
+import { fetchSupabaseData, saveSupabaseState, getSupabaseClient } from './lib/supabase';
 
 export default function App() {
   const [role, setRole] = useState<'guest' | 'admin'>('guest');
@@ -42,8 +43,6 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Automatically switch to MessagingApi if they are still on Notify but have a channel access token,
-        // or if they had Notify selected but Notify is deprecated.
         if (parsed.lineTokenType === 'Notify' && (!parsed.lineNotifyToken || parsed.lineChannelAccessToken)) {
           parsed.lineTokenType = 'MessagingApi';
         }
@@ -55,25 +54,89 @@ export default function App() {
     return DEFAULT_SETTINGS;
   });
 
-  // Save states automatically on changes (using v5 namespace)
+  const isRemoteSyncRef = useRef(false);
+
+  // Initial Sync from Supabase on mount or when Supabase credentials change
+  useEffect(() => {
+    let isMounted = true;
+    async function loadFromSupabase() {
+      const data = await fetchSupabaseData(settings);
+      if (data && isMounted) {
+        isRemoteSyncRef.current = true;
+        if (data.rooms) setRooms(data.rooms);
+        if (data.bookings) setBookings(data.bookings);
+        if (data.invoices) setInvoices(data.invoices);
+        if (data.tickets) setTickets(data.tickets);
+        if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+        setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+      }
+    }
+    loadFromSupabase();
+
+    // Setup Realtime subscription
+    const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
+    if (client) {
+      const channel = client
+        .channel('dormy_state_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'dormy_state' },
+          (payload: any) => {
+            if (payload && payload.new && payload.new.id && payload.new.data) {
+              isRemoteSyncRef.current = true;
+              const { id, data: newData } = payload.new;
+              if (id === 'rooms') setRooms(newData);
+              if (id === 'bookings') setBookings(newData);
+              if (id === 'invoices') setInvoices(newData);
+              if (id === 'tickets') setTickets(newData);
+              if (id === 'settings') setSettings(prev => ({ ...prev, ...newData }));
+              setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        isMounted = false;
+        client.removeChannel(channel);
+      };
+    }
+  }, [settings.supabaseUrl, settings.supabaseAnonKey]);
+
+  // Save states automatically on changes to localStorage AND Supabase
   useEffect(() => {
     localStorage.setItem('dormy_v5_rooms', JSON.stringify(rooms));
-  }, [rooms]);
+    if (!isRemoteSyncRef.current) {
+      saveSupabaseState('rooms', rooms, settings);
+    }
+  }, [rooms, settings]);
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_bookings', JSON.stringify(bookings));
-  }, [bookings]);
+    if (!isRemoteSyncRef.current) {
+      saveSupabaseState('bookings', bookings, settings);
+    }
+  }, [bookings, settings]);
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_invoices', JSON.stringify(invoices));
-  }, [invoices]);
+    if (!isRemoteSyncRef.current) {
+      saveSupabaseState('invoices', invoices, settings);
+    }
+  }, [invoices, settings]);
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_tickets', JSON.stringify(tickets));
-  }, [tickets]);
+    if (!isRemoteSyncRef.current) {
+      saveSupabaseState('tickets', tickets, settings);
+    }
+  }, [tickets, settings]);
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
+    if (!isRemoteSyncRef.current) {
+      saveSupabaseState('settings', settings, settings);
+    }
   }, [settings]);
 
 
