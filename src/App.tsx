@@ -62,6 +62,7 @@ export default function App() {
 
   const isRemoteSyncRef = useRef(false);
   const lastUpdatedRef = useRef<number>(0);
+  const isInitialFetchDoneRef = useRef(false);
 
   // Sync with built-in Server DB and Supabase on mount and poll every 3 seconds for live updates
   useEffect(() => {
@@ -86,6 +87,9 @@ export default function App() {
           }));
           setTimeout(() => { isRemoteSyncRef.current = false; }, 500);
         }
+      }
+      if (isMounted && !isInitialFetchDoneRef.current) {
+        isInitialFetchDoneRef.current = true;
       }
     }
 
@@ -161,7 +165,7 @@ export default function App() {
   // Save states automatically on changes to localStorage, Express Server DB AND Supabase
   useEffect(() => {
     localStorage.setItem('dormy_v5_rooms', JSON.stringify(rooms));
-    if (!isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       saveServerDb({ rooms });
       saveSupabaseState('rooms', rooms, settings);
     }
@@ -169,7 +173,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_bookings', JSON.stringify(bookings));
-    if (!isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       saveServerDb({ bookings });
       saveSupabaseState('bookings', bookings, settings);
     }
@@ -177,7 +181,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_invoices', JSON.stringify(invoices));
-    if (!isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       saveServerDb({ invoices });
       saveSupabaseState('invoices', invoices, settings);
     }
@@ -185,7 +189,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_tickets', JSON.stringify(tickets));
-    if (!isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       saveServerDb({ tickets });
       saveSupabaseState('tickets', tickets, settings);
     }
@@ -193,7 +197,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
-    if (!isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
       saveServerDb({ settings });
       saveSupabaseState('settings', settings, settings);
     }
