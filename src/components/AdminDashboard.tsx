@@ -5,7 +5,7 @@ import {
   Trash2, FileText, Check, Clock, TrendingUp, AlertTriangle, 
   Home, ClipboardList, CreditCard, ChevronRight, CheckCircle2, DollarSign, Edit3, X, HelpCircle,
   Upload, Image as ImageIcon, Bell, Send, AlertCircle, Calendar, ChevronLeft, Wrench, Sparkles,
-  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity, ZoomIn, ZoomOut, Database
+  Search, Filter, Download, Maximize2, RotateCw, Copy, ExternalLink, Activity, ZoomIn, ZoomOut, Database, RefreshCw
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, AreaChart, Area
@@ -61,6 +61,8 @@ interface AdminDashboardProps {
   onUpdateInvoices: (invoices: UtilityInvoice[]) => void;
   onUpdateSettings: (settings: SystemSettings) => void;
   onUpdateTickets: (tickets: MaintenanceTicket[]) => void;
+  onSyncNow?: () => void;
+  isSyncing?: boolean;
 }
 
 export default function AdminDashboard({
@@ -74,6 +76,8 @@ export default function AdminDashboard({
   onUpdateInvoices,
   onUpdateSettings,
   onUpdateTickets,
+  onSyncNow,
+  isSyncing = false,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'rooms' | 'bookings' | 'utilities' | 'settings' | 'maintenance'>('overview');
   
@@ -976,9 +980,22 @@ export default function AdminDashboard({
                 <h1 className="text-3xl font-extrabold text-white tracking-tight">แดชบอร์ดสรุปผลผู้บริหาร</h1>
                 <p className="text-slate-400 text-sm mt-1">ข้อมูลสถานะห้องพัก รายได้ประจำเดือน และใบเสร็จค้างจ่ายแบบเรียลไทม์</p>
               </div>
-              <div className="bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700/60 flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs text-slate-300 font-medium">ระบบกำลังทำงาน (Live Synced)</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700/60 flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs text-slate-300 font-medium">ระบบกำลังทำงาน (Live Synced)</span>
+                </div>
+                {onSyncNow && (
+                  <button
+                    onClick={onSyncNow}
+                    disabled={isSyncing}
+                    className="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm hover:shadow-emerald-500/10"
+                    title="กดเพื่อดึงและบันทึกข้อมูลล่าสุดจากเซิร์ฟเวอร์ ให้ข้อมูลตรงกันทุกเครื่อง"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'กำลังซิงค์...' : '🔄 ซิงค์ข้อมูลข้ามเครื่อง'}
+                  </button>
+                )}
               </div>
             </div>
 

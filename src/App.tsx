@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, User, Shield, HelpCircle, FileText, Sparkles, Key, Check, Info, AlertTriangle, Trash2, X
+  Building, User, Shield, HelpCircle, FileText, Sparkles, Key, Check, Info, AlertTriangle, Trash2, X, RefreshCw
 } from 'lucide-react';
 import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from './types';
 import { INITIAL_ROOMS, INITIAL_BOOKINGS, INITIAL_INVOICES, DEFAULT_SETTINGS, INITIAL_TICKETS } from './data';
@@ -63,6 +63,58 @@ export default function App() {
   const isRemoteSyncRef = useRef(false);
   const lastUpdatedRef = useRef<number>(0);
   const isInitialFetchDoneRef = useRef(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSyncSuccess, setShowSyncSuccess] = useState(false);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      const db = await fetchServerDb();
+      if (db) {
+        if (db.rooms && db.rooms.length > 0) setRooms(db.rooms);
+        if (db.bookings) setBookings(db.bookings);
+        if (db.invoices) setInvoices(db.invoices);
+        if (db.tickets) setTickets(db.tickets);
+        if (db.settings) setSettings(prev => ({
+          ...DEFAULT_SETTINGS,
+          ...prev,
+          ...db.settings,
+          supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+          supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+        }));
+      }
+
+      const supData = await fetchSupabaseData(settings);
+      if (supData) {
+        if (supData.rooms && supData.rooms.length > 0) setRooms(supData.rooms);
+        if (supData.bookings) setBookings(supData.bookings);
+        if (supData.invoices) setInvoices(supData.invoices);
+        if (supData.tickets) setTickets(supData.tickets);
+        if (supData.settings) setSettings(prev => ({
+          ...DEFAULT_SETTINGS,
+          ...prev,
+          ...supData.settings,
+          supabaseUrl: supData.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
+          supabaseAnonKey: supData.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+        }));
+      }
+
+      // Enforce saving back to server & Supabase
+      await saveServerDb({ rooms, bookings, invoices, tickets, settings });
+      await saveSupabaseState('rooms', rooms, settings);
+      await saveSupabaseState('bookings', bookings, settings);
+      await saveSupabaseState('invoices', invoices, settings);
+      await saveSupabaseState('tickets', tickets, settings);
+      await saveSupabaseState('settings', settings, settings);
+
+      setShowSyncSuccess(true);
+      setTimeout(() => setShowSyncSuccess(false), 4000);
+    } catch (err) {
+      console.error('Manual sync failed:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Sync with built-in Server DB and Supabase on mount and poll every 3 seconds for live updates
   useEffect(() => {
@@ -335,6 +387,17 @@ export default function App() {
             </div>
 
             <button
+              id="btn-sync-now"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all duration-300 font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-emerald-500/10"
+              title="ซิงค์ข้อมูลล่าสุดกับเซิร์ฟเวอร์เพื่อให้ข้อมูลตรงกันทุกอุปกรณ์"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'กำลังซิงค์...' : 'ซิงค์ข้อมูลข้ามเครื่อง'}
+            </button>
+
+            <button
               id="btn-reset-db"
               onClick={handleResetDatabase}
               className="text-xs bg-white/5 text-slate-400 border border-white/5 px-3.5 py-2 rounded-xl hover:bg-white/10 hover:text-white transition-all duration-300 font-light whitespace-nowrap cursor-pointer hover:border-white/10"
@@ -365,6 +428,8 @@ export default function App() {
                 onUpdateInvoices={setInvoices}
                 tickets={tickets}
                 onUpdateTickets={setTickets}
+                onSyncNow={handleManualSync}
+                isSyncing={isSyncing}
               />
             </motion.div>
           ) : (
@@ -386,6 +451,8 @@ export default function App() {
                 onUpdateInvoices={setInvoices}
                 onUpdateTickets={setTickets}
                 onUpdateSettings={setSettings}
+                onSyncNow={handleManualSync}
+                isSyncing={isSyncing}
               />
             </motion.div>
           )}
@@ -460,6 +527,32 @@ export default function App() {
               </div>
               <button
                 onClick={() => setShowResetSuccess(false)}
+                className="ml-auto text-slate-500 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Custom Sync Success Toast */}
+        {showSyncSuccess && (
+          <div className="fixed bottom-6 right-6 z-50 max-w-md">
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              className="bg-[#0c0c12] border border-emerald-500/30 rounded-2xl p-4 shadow-2xl flex items-center gap-3"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div className="text-left flex-1">
+                <h4 className="text-xs font-bold text-white">✨ ซิงค์ข้อมูลข้ามอุปกรณ์สำเร็จ!</h4>
+                <p className="text-[11px] text-slate-300 mt-0.5 font-light leading-snug">ดึงและอัปเดตข้อมูลล่าสุดจากเซิร์ฟเวอร์เรียบร้อยแล้ว มือถือและคอมพิวเตอร์เห็นตรงกัน 100%</p>
+              </div>
+              <button
+                onClick={() => setShowSyncSuccess(false)}
                 className="ml-auto text-slate-500 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />

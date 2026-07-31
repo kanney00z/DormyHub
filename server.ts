@@ -23,7 +23,10 @@ async function startServer() {
     try {
       if (fs.existsSync(dbFilePath)) {
         const raw = fs.readFileSync(dbFilePath, "utf-8");
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
+          return parsed;
+        }
       }
     } catch (err) {
       console.error("Error reading db.json, resetting to initial state:", err);

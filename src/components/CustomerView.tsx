@@ -17,6 +17,8 @@ interface CustomerViewProps {
   onUpdateInvoices?: (invoices: UtilityInvoice[]) => void;
   tickets?: MaintenanceTicket[];
   onUpdateTickets?: (tickets: MaintenanceTicket[]) => void;
+  onSyncNow?: () => void;
+  isSyncing?: boolean;
 }
 
 export default function CustomerView({ 
@@ -26,7 +28,9 @@ export default function CustomerView({
   invoices,
   onUpdateInvoices,
   tickets = [],
-  onUpdateTickets
+  onUpdateTickets,
+  onSyncNow,
+  isSyncing = false
 }: CustomerViewProps) {
   const [selectedType, setSelectedType] = useState<string>('All');
   const [bookingMode, setBookingMode] = useState<'daily' | 'monthly'>('daily');
@@ -466,6 +470,19 @@ export default function CustomerView({
                 <Wrench className="w-4.5 h-4.5 text-amber-400 stroke-[2.2]" />
                 <span>แจ้งซ่อม / แจ้งปัญหา</span>
               </button>
+
+              {onSyncNow && (
+                <button
+                  id="btn-customer-sync-now"
+                  onClick={onSyncNow}
+                  disabled={isSyncing}
+                  className="px-5 py-3.5 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 hover:border-emerald-400/40 font-semibold text-sm transition-all duration-300 flex items-center justify-center gap-2 w-full lg:w-auto shadow-lg hover:shadow-emerald-500/5 cursor-pointer shrink-0"
+                  title="ซิงค์ข้อมูลล่าสุดกับเซิร์ฟเวอร์เพื่อให้ข้อมูลตรงกันทุกอุปกรณ์"
+                >
+                  <RefreshCw className={`w-4 h-4 text-emerald-400 stroke-[2.5] ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'กำลังซิงค์...' : 'ซิงค์ข้อมูล'}</span>
+                </button>
+              )}
             </div>
 
             {/* Right: Search & Room Type Filters */}
