@@ -299,7 +299,10 @@ export default function App() {
     setBookings(prev => [newBooking, ...prev]);
 
     // Push immediately to server DB
-    await syncBookingServerDb(newBooking, rooms);
+    const res = await syncBookingServerDb(newBooking, rooms);
+    if (res && res.lastUpdated) {
+      lastUpdatedRef.current = res.lastUpdated;
+    }
 
     // Send LINE Notification
     if (settings.lineNotificationEnabled) {
@@ -345,7 +348,10 @@ export default function App() {
     setTickets(INITIAL_TICKETS);
     setSettings(DEFAULT_SETTINGS);
 
-    await resetServerDb();
+    const res = await resetServerDb();
+    if (res && res.lastUpdated) {
+      lastUpdatedRef.current = res.lastUpdated;
+    }
 
     setShowResetConfirm(false);
     setShowResetSuccess(true);

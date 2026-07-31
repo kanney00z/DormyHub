@@ -39,27 +39,31 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ s
   }
 }
 
-export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Promise<boolean> {
+export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
     const res = await fetch('/api/db/booking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ booking, rooms }),
     });
-    return res.ok;
+    if (!res.ok) return { success: false };
+    const data = await res.json();
+    return { success: true, lastUpdated: data.lastUpdated };
   } catch {
-    return false;
+    return { success: false };
   }
 }
 
-export async function resetServerDb(): Promise<boolean> {
+export async function resetServerDb(): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
     const res = await fetch('/api/db/reset', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
-    return res.ok;
+    if (!res.ok) return { success: false };
+    const data = await res.json();
+    return { success: true, lastUpdated: data.lastUpdated };
   } catch {
-    return false;
+    return { success: false };
   }
 }

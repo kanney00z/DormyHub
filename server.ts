@@ -97,7 +97,9 @@ async function startServer() {
       if (invoices !== undefined) db.invoices = invoices;
       if (tickets !== undefined) db.tickets = tickets;
       if (settings !== undefined) db.settings = settings;
-      db.lastUpdated = Date.now();
+      
+      const now = Date.now();
+      db.lastUpdated = Math.max(now, (db.lastUpdated || 0) + 1);
 
       queuePersistDbToDisk();
       return res.json({ success: true, lastUpdated: db.lastUpdated, state: db });
@@ -110,16 +112,17 @@ async function startServer() {
   // POST /api/db/reset - Reset DB back to initial default state
   app.post("/api/db/reset", (req: express.Request, res: express.Response) => {
     try {
+      const now = Date.now();
       inMemoryDb = {
         rooms: INITIAL_ROOMS,
         bookings: INITIAL_BOOKINGS,
         invoices: INITIAL_INVOICES,
         tickets: INITIAL_TICKETS,
         settings: DEFAULT_SETTINGS,
-        lastUpdated: Date.now(),
+        lastUpdated: Math.max(now, (inMemoryDb?.lastUpdated || 0) + 1),
       };
       persistDbToDiskSync();
-      return res.json({ success: true, state: inMemoryDb });
+      return res.json({ success: true, lastUpdated: inMemoryDb.lastUpdated, state: inMemoryDb });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || "Failed to reset DB" });
     }
@@ -148,9 +151,10 @@ async function startServer() {
         db.rooms = updatedRooms;
       }
 
-      db.lastUpdated = Date.now();
+      const now = Date.now();
+      db.lastUpdated = Math.max(now, (db.lastUpdated || 0) + 1);
       queuePersistDbToDisk();
-      return res.json({ success: true, state: db });
+      return res.json({ success: true, lastUpdated: db.lastUpdated, state: db });
     } catch (err: any) {
       return res.status(500).json({ error: err.message || "Failed to add booking" });
     }
