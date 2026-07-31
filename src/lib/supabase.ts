@@ -6,8 +6,8 @@ let currentUrl = '';
 let currentKey = '';
 
 export function getSupabaseClient(customUrl?: string, customKey?: string): SupabaseClient | null {
-  const url = customUrl || (import.meta.env.VITE_SUPABASE_URL as string) || 'https://iyiwangdlyqteukhhva.supabase.co';
-  const key = customKey || (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'sb_publishable_GNoGpqaIcb1nEvpjEF96oQ_eeyr5P2r';
+  const url = (customUrl !== undefined ? customUrl : (import.meta.env.VITE_SUPABASE_URL as string)) || '';
+  const key = (customKey !== undefined ? customKey : (import.meta.env.VITE_SUPABASE_ANON_KEY as string)) || '';
 
   if (!url || !key || url.trim() === '' || key.trim() === '') {
     return null;

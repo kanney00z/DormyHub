@@ -3470,20 +3470,20 @@ export default function AdminDashboard({
                         <Database className="w-5 h-5" />
                       </div>
                       <div>
-                        <h3 className="text-base font-bold text-white flex items-center gap-2">
-                          เชื่อมต่อ Supabase Database (ซิงค์ข้ามเครื่อง Real-time)
+                        <h3 className="text-base font-bold text-white flex items-center flex-wrap gap-2">
+                          เชื่อมต่อ Supabase Database (ทางเลือก External Database)
                           {settings.supabaseUrl && settings.supabaseAnonKey ? (
                             <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30 font-mono">
-                              ● พร้อมใช้งาน
+                              ● มีการระบุ Supabase Credentials
                             </span>
                           ) : (
-                            <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
-                              ○ โหมด LocalStorage
+                            <span className="text-[10px] bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-full border border-sky-500/30 font-mono">
+                              ⚡ ทำงานผ่าน Express Server DB ในตัว (แนะนำ - Real-time Sync)
                             </span>
                           )}
                         </h3>
                         <p className="text-xs text-slate-400">
-                          เมื่อใส่ URL และ Anon Key ข้อมูลการจอง ยูนิต และบิลจะแสดงผลเหมือนกันทุกเครื่องแบบ Real-time <span className="inline-block mt-1 sm:mt-0 px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px] font-medium">🔒 บันทึกถาวรลงระบบแล้ว (เปิดจากเครื่องอื่นใช้งานได้ทันที)</span>
+                          ระบบซิงค์ข้อมูล Real-time ข้ามเครื่องอัตโนมัติผ่าน Express Server DB อยู่แล้ว <span className="text-slate-300 font-medium">(หากต้องการใช้ Supabase ภายนอกเพิ่มเติม สามารถกรอก URL และ Anon Key ของคุณได้)</span>
                         </p>
                       </div>
                     </div>

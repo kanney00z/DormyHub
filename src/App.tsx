@@ -50,8 +50,8 @@ export default function App() {
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
-          supabaseUrl: parsed.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-          supabaseAnonKey: parsed.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+          supabaseUrl: parsed.supabaseUrl || '',
+          supabaseAnonKey: parsed.supabaseAnonKey || '',
         };
       } catch (e) {
         return DEFAULT_SETTINGS;
@@ -94,8 +94,8 @@ export default function App() {
           const newSet = {
             ...DEFAULT_SETTINGS,
             ...db.settings,
-            supabaseUrl: db.settings.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-            supabaseAnonKey: db.settings.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+            supabaseUrl: db.settings.supabaseUrl || '',
+            supabaseAnonKey: db.settings.supabaseAnonKey || '',
           };
           setSettings(newSet);
           localStorage.setItem('dormy_v5_settings', JSON.stringify(newSet));
@@ -169,8 +169,8 @@ export default function App() {
             ...DEFAULT_SETTINGS,
             ...prev,
             ...db.settings,
-            supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-            supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+            supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || '',
+            supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
           }));
           setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
         }
@@ -183,10 +183,10 @@ export default function App() {
     // Initial fetch from server DB
     syncWithServerDb();
 
-    // Poll server DB every 1.2 seconds so any new booking/update from another device or machine instantly appears
+    // Poll server DB every 1.0 second so any new booking/update from another device or machine instantly appears
     const pollInterval = setInterval(() => {
       syncWithServerDb();
-    }, 1200);
+    }, 1000);
 
     // Initial Sync from Supabase if credentials are configured
     async function loadFromSupabase() {
@@ -201,8 +201,8 @@ export default function App() {
           ...DEFAULT_SETTINGS,
           ...prev,
           ...data.settings,
-          supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-          supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+          supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || '',
+          supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
         }));
         setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
       }
@@ -230,8 +230,8 @@ export default function App() {
                 ...DEFAULT_SETTINGS,
                 ...prev,
                 ...newData,
-                supabaseUrl: newData.supabaseUrl || prev.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
-                supabaseAnonKey: newData.supabaseAnonKey || prev.supabaseAnonKey || DEFAULT_SETTINGS.supabaseAnonKey,
+                supabaseUrl: newData.supabaseUrl || prev.supabaseUrl || '',
+                supabaseAnonKey: newData.supabaseAnonKey || prev.supabaseAnonKey || '',
               }));
               setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
             }
