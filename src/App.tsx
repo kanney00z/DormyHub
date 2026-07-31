@@ -9,7 +9,7 @@ import CustomerView from './components/CustomerView';
 import AdminDashboard from './components/AdminDashboard';
 import { sendLineNotification } from './utils/line';
 import { fetchSupabaseData, saveSupabaseState, getSupabaseClient } from './lib/supabase';
-import { fetchServerDb, saveServerDb, syncBookingServerDb } from './lib/serverDb';
+import { fetchServerDb, saveServerDb, syncBookingServerDb, resetServerDb } from './lib/serverDb';
 
 export default function App() {
   const [role, setRole] = useState<'guest' | 'admin'>('guest');
@@ -221,7 +221,7 @@ export default function App() {
   };
 
   // Execute database reset
-  const executeResetDatabase = () => {
+  const executeResetDatabase = async () => {
     localStorage.removeItem('dormy_v5_rooms');
     localStorage.removeItem('dormy_v5_bookings');
     localStorage.removeItem('dormy_v5_invoices');
@@ -233,6 +233,8 @@ export default function App() {
     setInvoices(INITIAL_INVOICES);
     setTickets(INITIAL_TICKETS);
     setSettings(DEFAULT_SETTINGS);
+
+    await resetServerDb();
 
     setShowResetConfirm(false);
     setShowResetSuccess(true);

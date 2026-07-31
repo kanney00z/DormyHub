@@ -49,3 +49,15 @@ export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Pro
     return false;
   }
 }
+
+export async function resetServerDb(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/db/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

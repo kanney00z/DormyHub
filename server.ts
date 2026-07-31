@@ -82,11 +82,11 @@ async function startServer() {
       const { rooms, bookings, invoices, tickets, settings } = req.body;
 
       const updatedState = {
-        rooms: rooms || current.rooms,
-        bookings: bookings || current.bookings,
-        invoices: invoices || current.invoices,
-        tickets: tickets || current.tickets,
-        settings: settings || current.settings,
+        rooms: rooms !== undefined ? rooms : current.rooms,
+        bookings: bookings !== undefined ? bookings : current.bookings,
+        invoices: invoices !== undefined ? invoices : current.invoices,
+        tickets: tickets !== undefined ? tickets : current.tickets,
+        settings: settings !== undefined ? settings : current.settings,
         lastUpdated: Date.now(),
       };
 
@@ -95,6 +95,24 @@ async function startServer() {
     } catch (err: any) {
       console.error("Error syncing DB state:", err);
       return res.status(500).json({ error: err.message || "Failed to update DB" });
+    }
+  });
+
+  // POST /api/db/reset - Reset DB back to initial default state
+  app.post("/api/db/reset", (req: express.Request, res: express.Response) => {
+    try {
+      const initState = {
+        rooms: INITIAL_ROOMS,
+        bookings: INITIAL_BOOKINGS,
+        invoices: INITIAL_INVOICES,
+        tickets: INITIAL_TICKETS,
+        settings: DEFAULT_SETTINGS,
+        lastUpdated: Date.now(),
+      };
+      saveDbState(initState);
+      return res.json({ success: true, state: initState });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to reset DB" });
     }
   });
 
