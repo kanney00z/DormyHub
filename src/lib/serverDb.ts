@@ -39,11 +39,13 @@ async function requestExpressApi(path: string, options?: RequestInit): Promise<R
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         return res;
-      }
-    } else {
-      if (res.status === 404 || res.status === 405 || res.status === 502) {
+      } else {
+        // Returned 200 OK HTML (e.g. Vercel SPA fallback). Express API endpoint does not exist.
         serverApiDisabled = true;
       }
+    } else {
+      // 405 Method Not Allowed, 404 Not Found, etc.
+      serverApiDisabled = true;
     }
   } catch {
     serverApiDisabled = true;
@@ -56,7 +58,8 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
   if (now < cloudCooldownUntil) {
     return inMemoryCache;
   }
-  if (now - lastCloudFetchTime < 5000 && inMemoryCache) {
+  // Throttle cloud GETs to at most once every 30 seconds to prevent 429 rate limits
+  if (now - lastCloudFetchTime < 30000 && inMemoryCache) {
     return inMemoryCache;
   }
 
@@ -71,7 +74,8 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
         return data;
       }
     } else if (res.status === 429) {
-      cloudCooldownUntil = now + 60000;
+      // 3-minute backoff on 429 Too Many Requests
+      cloudCooldownUntil = now + 180000;
     }
   } catch {
     // Silent catch
@@ -81,6 +85,11 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
 }
 
 async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
+  const now = Date.now();
+  if (now < cloudCooldownUntil) {
+    return false;
+  }
+
   try {
     const res = await fetch(JSON_BLOB_URL, {
       method: 'PUT',
@@ -93,6 +102,8 @@ async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
     if (res.ok) {
       inMemoryCache = fullState;
       return true;
+    } else if (res.status === 429) {
+      cloudCooldownUntil = now + 180000;
     }
   } catch {
     // Silent catch
@@ -101,7 +112,7 @@ async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
 }
 
 export async function fetchServerDb(): Promise<ServerDbState | null> {
-  // 1. Try Express backend API (/api/db) first
+  // 1. Try Express backend API (/api/db) first if available
   if (!serverApiDisabled) {
     try {
       const res = await requestExpressApi('/api/db');
@@ -148,7 +159,7 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ s
   let expressSuccess = false;
   let expressLastUpdated: number | undefined;
 
-  // 1. Save to local Express backend server API (/api/db)
+  // 1. Save to local Express backend server API (/api/db) if available
   if (!serverApiDisabled) {
     try {
       const res = await requestExpressApi('/api/db', {
