@@ -66,6 +66,7 @@ export default function App() {
   });
 
   const isRemoteSyncRef = useRef(false);
+  const isPendingSaveRef = useRef(false);
   const lastUpdatedRef = useRef<number>(0);
   const lastSupabaseUpdatedRef = useRef<number>(0);
   const isInitialFetchDoneRef = useRef(false);
@@ -79,7 +80,7 @@ export default function App() {
     (async () => {
       try {
         const db = await fetchServerDb();
-        if (db && isMounted && db.rooms && Array.isArray(db.rooms) && db.rooms.length > 0) {
+        if (db && isMounted && db.rooms && Array.isArray(db.rooms)) {
           hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
@@ -89,9 +90,12 @@ export default function App() {
           if (db.tickets) setTickets(db.tickets);
           if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
           setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 800);
+        } else {
+          hasLoadedInitialServerDbRef.current = true;
         }
       } catch (e) {
         console.warn('Initial server DB sync notice:', e);
+        hasLoadedInitialServerDbRef.current = true;
       } finally {
         if (isMounted) {
           isInitialFetchDoneRef.current = true;
@@ -288,14 +292,14 @@ export default function App() {
     }
 
     async function syncWithServerDb() {
+      if (isPendingSaveRef.current) return;
       const db = await fetchServerDb();
-      if (db && isMounted && db.rooms && Array.isArray(db.rooms) && db.rooms.length > 0) {
+      if (db && isMounted && db.rooms && Array.isArray(db.rooms)) {
         const serverTime = db.lastUpdated || 0;
         if (!hasLoadedInitialServerDbRef.current || serverTime > lastUpdatedRef.current) {
           hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = serverTime;
           isRemoteSyncRef.current = true;
-          if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
           if (db.rooms) setRooms(db.rooms);
           if (db.bookings) setBookings(db.bookings);
           if (db.invoices) setInvoices(db.invoices);
@@ -307,12 +311,13 @@ export default function App() {
             supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || '',
             supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
           }));
-          setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 1000);
+          setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 800);
         }
       }
     }
 
     async function loadFromSupabase() {
+      if (isPendingSaveRef.current) return;
       const data = await fetchSupabaseData(settings);
       if (data && isMounted) {
         const time = data.lastUpdatedTime || Date.now();
@@ -398,33 +403,39 @@ export default function App() {
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
 
     if (isInitialFetchDoneRef.current && hasLoadedInitialServerDbRef.current && !isRemoteSyncRef.current) {
+      isPendingSaveRef.current = true;
+      const now = Date.now();
+      lastUpdatedRef.current = now;
+
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       saveTimeoutRef.current = setTimeout(async () => {
-        const now = Date.now();
-        lastUpdatedRef.current = now;
-        lastSupabaseUpdatedRef.current = now;
+        try {
+          lastSupabaseUpdatedRef.current = now;
 
-        const res = await saveServerDb({ rooms, bookings, invoices, tickets, settings });
-        if (res.lastUpdated) {
-          lastUpdatedRef.current = res.lastUpdated;
-          if (typeof BroadcastChannel !== 'undefined') {
-            try {
-              const bc = new BroadcastChannel('dormy_realtime_tab_sync');
-              bc.postMessage({
-                type: 'STATE_UPDATED',
-                db: { rooms, bookings, invoices, tickets, settings, lastUpdated: res.lastUpdated }
-              });
-              bc.close();
-            } catch (e) {}
+          const res = await saveServerDb({ rooms, bookings, invoices, tickets, settings });
+          if (res && res.lastUpdated) {
+            lastUpdatedRef.current = res.lastUpdated;
+            if (typeof BroadcastChannel !== 'undefined') {
+              try {
+                const bc = new BroadcastChannel('dormy_realtime_tab_sync');
+                bc.postMessage({
+                  type: 'STATE_UPDATED',
+                  db: { rooms, bookings, invoices, tickets, settings, lastUpdated: res.lastUpdated }
+                });
+                bc.close();
+              } catch (e) {}
+            }
           }
+          
+          saveSupabaseState('rooms', rooms, settings);
+          saveSupabaseState('bookings', bookings, settings);
+          saveSupabaseState('invoices', invoices, settings);
+          saveSupabaseState('tickets', tickets, settings);
+          saveSupabaseState('settings', settings, settings);
+        } finally {
+          isPendingSaveRef.current = false;
         }
-        
-        saveSupabaseState('rooms', rooms, settings);
-        saveSupabaseState('bookings', bookings, settings);
-        saveSupabaseState('invoices', invoices, settings);
-        saveSupabaseState('tickets', tickets, settings);
-        saveSupabaseState('settings', settings, settings);
       }, 100);
     }
   }, [rooms, bookings, invoices, tickets, settings]);

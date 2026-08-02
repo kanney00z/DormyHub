@@ -38,7 +38,7 @@ async function startServer() {
       if (fs.existsSync(dbFilePath)) {
         const raw = fs.readFileSync(dbFilePath, "utf-8");
         const parsed = JSON.parse(raw);
-        if (parsed && Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
+        if (parsed && Array.isArray(parsed.rooms)) {
           inMemoryDb = parsed;
           return inMemoryDb;
         }
