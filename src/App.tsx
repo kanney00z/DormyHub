@@ -20,7 +20,7 @@ export default function App() {
   const [showResetSuccess, setShowResetSuccess] = useState(false);
   const [showSyncCenterModal, setShowSyncCenterModal] = useState(false);
   const [syncModalTab, setSyncModalTab] = useState<'link' | 'supabase' | 'code'>('link');
-  const [qrType, setQrType] = useState<'url' | 'data'>('url');
+  const [qrType, setQrType] = useState<'url' | 'data'>('data');
   const [syncActionStatus, setSyncActionStatus] = useState<{ loading: boolean; msg?: string; success?: boolean } | null>(null);
 
   // State initialization with LocalStorage backup for absolute durability (using v5 namespace for clean reset)
