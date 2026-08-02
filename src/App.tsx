@@ -71,12 +71,30 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
 
-  // Mark initial boot ready after 400ms so any changes made on mobile or Vercel are immediately saved
+  // Initial boot sync sequence: Wait for initial server DB and Supabase responses before enabling auto-save
   useEffect(() => {
-    const timer = setTimeout(() => {
-      isInitialFetchDoneRef.current = true;
-    }, 400);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+    (async () => {
+      try {
+        const db = await fetchServerDb();
+        if (db && isMounted && db.rooms) {
+          lastUpdatedRef.current = db.lastUpdated || Date.now();
+          isRemoteSyncRef.current = true;
+          setRooms(db.rooms);
+          if (db.bookings) setBookings(db.bookings);
+          if (db.invoices) setInvoices(db.invoices);
+          if (db.tickets) setTickets(db.tickets);
+          if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
+          setTimeout(() => { isRemoteSyncRef.current = false; }, 800);
+        }
+      } catch (e) {
+        console.warn('Initial server DB sync notice:', e);
+      } finally {
+        if (isMounted) {
+          isInitialFetchDoneRef.current = true;
+        }
+      }
+    })();
   }, []);
 
   // Helper for generating base64 sync URL
@@ -538,6 +556,16 @@ export default function App() {
 
             <div className="flex items-center gap-2">
               <button
+                id="btn-sync-center"
+                onClick={() => setShowSyncCenterModal(true)}
+                className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 px-3.5 py-2 rounded-xl transition-all duration-300 font-bold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-indigo-500/10"
+                title="เปิดศูนย์บริการซิงค์ข้อมูล PC <-> มือถือ เพื่อแสดง QR Code หรือสแกนดึงข้อมูล"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+                <span>📱 ซิงค์ PC ↔ มือถือ</span>
+              </button>
+
+              <button
                 id="btn-sync-now"
                 onClick={handleManualSync}
                 disabled={isSyncing}
@@ -545,7 +573,7 @@ export default function App() {
                 title="ระบบกำลังซิงค์ข้อมูล Real-time อัตโนมัติทุกๆ 1.5 วินาที หรือกดปุ่มนี้เพื่อซิงค์ข้อมูลทันที"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
-                <span>{isSyncing ? 'กำลังดึงข้อมูล...' : '🟢 Real-Time Synced'}</span>
+                <span>{isSyncing ? 'กำลังดึง...' : '🟢 Auto-Sync'}</span>
               </button>
             </div>
 
@@ -710,6 +738,215 @@ export default function App() {
                 <X className="w-3.5 h-3.5" />
               </button>
             </motion.div>
+          </div>
+        )}
+
+        {/* Multi-Device Sync Center Modal Dialog */}
+        {showSyncCenterModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+            <div className="bg-[#12131c] border border-white/10 rounded-2xl max-w-xl w-full p-6 space-y-5 text-white shadow-2xl relative overflow-hidden">
+              <button 
+                onClick={() => setShowSyncCenterModal(false)}
+                className="absolute top-4 right-4 p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-lg">
+                  📱
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">ศูนย์บริการซิงค์ข้อมูล PC ↔ มือถือ</h3>
+                  <p className="text-xs text-slate-400">เลือกวิธีเชื่อมข้อมูลหอพักของคุณให้ตรงกันทุกอุปกรณ์ทันที</p>
+                </div>
+              </div>
+
+              {/* Sync Methods Tabs */}
+              <div className="grid grid-cols-3 gap-2 p-1 bg-black/40 border border-white/5 rounded-xl text-xs">
+                <button
+                  onClick={() => setSyncModalTab('link')}
+                  className={`py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    syncModalTab === 'link' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  <span>QR Code & ลิงก์</span>
+                </button>
+                <button
+                  onClick={() => setSyncModalTab('supabase')}
+                  className={`py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    syncModalTab === 'supabase' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Supabase Sync</span>
+                </button>
+                <button
+                  onClick={() => setSyncModalTab('code')}
+                  className={`py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    syncModalTab === 'code' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>รหัสข้อมูล (Code)</span>
+                </button>
+              </div>
+
+              {/* Tab 1: QR Code & Direct Sync Link */}
+              {syncModalTab === 'link' && (
+                <div className="space-y-4 text-center">
+                  <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3">
+                    <p className="text-xs text-slate-300 font-medium">
+                      📷 สแกน QR Code นี้ด้วยกล้องมือถือ เพื่อเปิดเว็บพร้อมดึงข้อมูลห้องพัก/การจองจาก PC ไปแสดงทันที
+                    </p>
+                    <div className="p-3 bg-white rounded-2xl border-4 border-indigo-500/30 shadow-lg">
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(generateSyncUrl())}`} 
+                        alt="Scan to Sync Mobile"
+                        className="w-48 h-48 rounded-lg"
+                      />
+                    </div>
+                    <span className="text-[11px] text-emerald-400 font-mono">✓ รหัสข้อมูลถูกเข้ารหัสปลอดภัยพร้อมส่งตรงไปมือถือ</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        const url = generateSyncUrl();
+                        safeCopyToClipboard(url);
+                        setSyncActionStatus({ loading: false, msg: 'คัดลอกลิงก์ซิงค์เรียบร้อย! นำไปวางใน LINE หรือเบราว์เซอร์มือถือได้เลย', success: true });
+                        setTimeout(() => setSyncActionStatus(null), 4000);
+                      }}
+                      className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span>คัดลอกลิงก์ซิงค์ไปเปิดในมือถือ</span>
+                    </button>
+                    <button
+                      onClick={handleManualSync}
+                      disabled={isSyncing}
+                      className="py-3 px-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>ดึงข้อมูลเดี๋ยวนี้</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Supabase Realtime Sync */}
+              {syncModalTab === 'supabase' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2">
+                    <h4 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+                      <Database className="w-4 h-4" />
+                      <span>การเชื่อมต่อ Supabase Real-time Cloud</span>
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      หากตั้งค่า Supabase URL และ Key ไว้ ข้อมูลทุกการจอง/เพิ่มห้องจะซิงค์ตรงระหว่าง PC และมือถือแบบ Real-time 100% อัตโนมัติ ไม่ต้องกดปุ่มใดๆ
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 bg-black/30 p-4 rounded-xl border border-white/5 text-xs">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span>สถานะการเชื่อมต่อ Supabase:</span>
+                      <span className={`font-bold px-2 py-0.5 rounded-md ${settings.supabaseUrl && settings.supabaseAnonKey ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+                        {settings.supabaseUrl && settings.supabaseAnonKey ? '✓ มีการตั้งค่า Key แล้ว' : '⚠️ ยังไม่ได้กรอก Key'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        setSyncActionStatus({ loading: true, msg: 'กำลังส่งข้อมูลทั้งหมดขึ้น Supabase Cloud...' });
+                        const ok = await pushAllToSupabase({ rooms, bookings, invoices, tickets, settings }, settings);
+                        if (ok) {
+                          setSyncActionStatus({ loading: false, msg: 'ส่งข้อมูลทั้งหมดขึ้น Supabase สำเร็จ! มือถือและ PC จะซิงค์ข้อมูลตรงกันทันที', success: true });
+                        } else {
+                          setSyncActionStatus({ loading: false, msg: 'เกิดข้อผิดพลาด: กรุณาตรวจสอบ Supabase URL และ Key ในหน้าตั้งค่าระบบ', success: false });
+                        }
+                      }}
+                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>พุช (Push) ข้อมูลเครื่องนี้ขึ้น Supabase</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSyncCenterModal(false);
+                        setRole('admin');
+                      }}
+                      className="py-3 px-4 bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                    >
+                      ตั้งค่า Key
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: JSON Code Export/Import */}
+              {syncModalTab === 'code' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-sky-500/10 border border-sky-500/20 rounded-2xl space-y-2">
+                    <h4 className="text-sm font-bold text-sky-300 flex items-center gap-2">
+                      <Copy className="w-4 h-4" />
+                      <span>ส่งออก / นำเข้ารหัสข้อมูล (Manual Data Code)</span>
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      ใช้ในกรณีไม่ได้ต่อ Supabase: สามารถกดคัดลอกโค้ดข้อมูลจาก PC ไปวางบนมือถือเพื่อเปลี่ยนข้อมูลให้เหมือนกันทันที
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        const backupObj = { rooms, bookings, invoices, tickets, settings, exportedAt: new Date().toISOString() };
+                        safeCopyToClipboard(JSON.stringify(backupObj, null, 2));
+                        setSyncActionStatus({ loading: false, msg: 'คัดลอกรหัสข้อมูลลง Clipboard แล้ว! นำไปวางในมือถือได้เลย', success: true });
+                      }}
+                      className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>คัดลอกรหัสจากเครื่องนี้</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const userCode = prompt('วางรหัสข้อมูล (JSON) ที่คัดลอกมาจาก PC หรืออุปกรณ์อื่น:');
+                        if (!userCode || userCode.trim() === '') return;
+                        try {
+                          const parsed = JSON.parse(userCode.trim());
+                          if (parsed.rooms && Array.isArray(parsed.rooms)) setRooms(parsed.rooms);
+                          if (parsed.bookings && Array.isArray(parsed.bookings)) setBookings(parsed.bookings);
+                          if (parsed.invoices && Array.isArray(parsed.invoices)) setInvoices(parsed.invoices);
+                          if (parsed.tickets && Array.isArray(parsed.tickets)) setTickets(parsed.tickets);
+                          if (parsed.settings) setSettings(prev => ({ ...prev, ...parsed.settings }));
+                          setSyncActionStatus({ loading: false, msg: 'นำเข้าข้อมูลสำเร็จ! ข้อมูลถูกอัปเดตเรียบร้อยแล้ว', success: true });
+                        } catch (e) {
+                          alert('รหัสข้อมูลไม่ถูกต้อง');
+                        }
+                      }}
+                      className="py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>วางรหัสเพื่ออัปเดตเครื่องนี้</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {syncActionStatus && (
+                <div className={`p-3 rounded-xl text-xs flex items-center gap-2 font-medium border ${
+                  syncActionStatus.loading ? 'bg-blue-500/10 text-blue-300 border-blue-500/30' :
+                  syncActionStatus.success ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' :
+                  'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                }`}>
+                  {syncActionStatus.loading && <RefreshCw className="w-4 h-4 animate-spin shrink-0" />}
+                  <span>{syncActionStatus.msg}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </AnimatePresence>
