@@ -93,6 +93,9 @@ async function startServer() {
 
   // GET /api/db - Returns shared server state for multi-device sync
   app.get("/api/db", (req: express.Request, res: express.Response) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     const state = loadDbState();
     return res.json(state);
   });

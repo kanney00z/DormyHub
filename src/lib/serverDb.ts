@@ -12,9 +12,22 @@ export interface ServerDbState {
 const FALLBACK_SERVER_URL = 'https://ais-pre-jjad4i42hp3gdfhxfo6uvr-361727948318.asia-southeast1.run.app';
 
 async function requestApi(path: string, options?: RequestInit): Promise<Response | null> {
+  const isGet = !options || !options.method || options.method.toUpperCase() === 'GET';
+  const queryPath = isGet ? `${path}${path.includes('?') ? '&' : '?'}_t=${Date.now()}` : path;
+
+  const fetchOptions: RequestInit = {
+    ...options,
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      ...(options?.headers || {}),
+    },
+  };
+
   // 1. Try relative request first
   try {
-    const res = await fetch(path, options);
+    const res = await fetch(queryPath, fetchOptions);
     if (res.ok) {
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
@@ -27,8 +40,8 @@ async function requestApi(path: string, options?: RequestInit): Promise<Response
 
   // 2. Fallback to Cloud Run Express server URL if relative call failed or returned HTML 404 (e.g. on Vercel)
   try {
-    const absoluteUrl = `${FALLBACK_SERVER_URL}${path}`;
-    const res = await fetch(absoluteUrl, options);
+    const absoluteUrl = `${FALLBACK_SERVER_URL}${queryPath}`;
+    const res = await fetch(absoluteUrl, fetchOptions);
     if (res.ok) {
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {

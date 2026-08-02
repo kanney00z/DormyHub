@@ -77,7 +77,7 @@ export default function App() {
     (async () => {
       try {
         const db = await fetchServerDb();
-        if (db && isMounted && db.rooms) {
+        if (db && isMounted && db.rooms && Array.isArray(db.rooms) && db.rooms.length > 0) {
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
           setRooms(db.rooms);
@@ -85,7 +85,7 @@ export default function App() {
           if (db.invoices) setInvoices(db.invoices);
           if (db.tickets) setTickets(db.tickets);
           if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
-          setTimeout(() => { isRemoteSyncRef.current = false; }, 800);
+          setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 800);
         }
       } catch (e) {
         console.warn('Initial server DB sync notice:', e);
@@ -328,11 +328,11 @@ export default function App() {
     syncWithServerDb();
     loadFromSupabase();
 
-    // Poll BOTH server DB and Supabase every 1.5 seconds so any update from mobile or another device appears live
+    // Poll BOTH server DB and Supabase every 1.0 second so any update from mobile or another device appears live
     const pollInterval = setInterval(() => {
       syncWithServerDb();
       loadFromSupabase();
-    }, 1500);
+    }, 1000);
 
     // Setup Supabase Realtime subscription if available
     const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
@@ -413,7 +413,7 @@ export default function App() {
         saveSupabaseState('invoices', invoices, settings);
         saveSupabaseState('tickets', tickets, settings);
         saveSupabaseState('settings', settings, settings);
-      }, 200);
+      }, 100);
     }
   }, [rooms, bookings, invoices, tickets, settings]);
 
@@ -570,10 +570,10 @@ export default function App() {
                 onClick={handleManualSync}
                 disabled={isSyncing}
                 className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all duration-300 font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-emerald-500/10"
-                title="ระบบกำลังซิงค์ข้อมูล Real-time อัตโนมัติทุกๆ 1.5 วินาที หรือกดปุ่มนี้เพื่อซิงค์ข้อมูลทันที"
+                title="ระบบซิงค์ข้อมูล Real-time อัตโนมัติแบบ 100% ทุก 1 วินาทีระหว่าง PC และมือถือโดยไม่ต้องกดอะไร"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
-                <span>{isSyncing ? 'กำลังดึง...' : '🟢 Auto-Sync'}</span>
+                <span>{isSyncing ? 'กำลังดึง...' : '🟢 Real-Time Active'}</span>
               </button>
             </div>
 
