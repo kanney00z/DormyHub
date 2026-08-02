@@ -97,16 +97,21 @@ export default function App() {
     })();
   }, []);
 
-  // Helper for generating base64 sync URL
+  // Helper for clean app URL (Short and clear for instant QR Code scanning)
+  const getAppBaseUrl = () => {
+    return window.location.origin + window.location.pathname;
+  };
+
+  // Helper for generating base64 sync URL (For direct link sharing)
   const generateSyncUrl = () => {
     try {
       const payload = { rooms, bookings, invoices, tickets, settings };
       const jsonStr = JSON.stringify(payload);
       const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
-      const baseUrl = window.location.origin + window.location.pathname;
+      const baseUrl = getAppBaseUrl();
       return `${baseUrl}?sync_data=${encoded}`;
     } catch {
-      return window.location.href;
+      return getAppBaseUrl();
     }
   };
 
@@ -557,7 +562,10 @@ export default function App() {
             <div className="flex items-center gap-2">
               <button
                 id="btn-sync-center"
-                onClick={() => setShowSyncCenterModal(true)}
+                onClick={async () => {
+                  setShowSyncCenterModal(true);
+                  saveServerDb({ rooms, bookings, invoices, tickets, settings });
+                }}
                 className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 px-3.5 py-2 rounded-xl transition-all duration-300 font-bold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-indigo-500/10"
                 title="เปิดศูนย์บริการซิงค์ข้อมูล PC <-> มือถือ เพื่อแสดง QR Code หรือสแกนดึงข้อมูล"
               >
@@ -798,30 +806,45 @@ export default function App() {
                 <div className="space-y-4 text-center">
                   <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3">
                     <p className="text-xs text-slate-300 font-medium">
-                      📷 สแกน QR Code นี้ด้วยกล้องมือถือ เพื่อเปิดเว็บพร้อมดึงข้อมูลห้องพัก/การจองจาก PC ไปแสดงทันที
+                      📷 สแกน QR Code นี้ด้วยกล้องมือถือ เพื่อเปิดเว็บหอพักบนมือถือ (ระบบซิงค์ Real-Time อัตโนมัติทันที)
                     </p>
                     <div className="p-3 bg-white rounded-2xl border-4 border-indigo-500/30 shadow-lg">
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(generateSyncUrl())}`} 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getAppBaseUrl())}`} 
                         alt="Scan to Sync Mobile"
-                        className="w-48 h-48 rounded-lg"
+                        className="w-52 h-52 rounded-lg object-contain"
                       />
                     </div>
-                    <span className="text-[11px] text-emerald-400 font-mono">✓ รหัสข้อมูลถูกเข้ารหัสปลอดภัยพร้อมส่งตรงไปมือถือ</span>
+                    <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{getAppBaseUrl()}</span>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       onClick={() => {
-                        const url = generateSyncUrl();
+                        const url = getAppBaseUrl();
                         safeCopyToClipboard(url);
-                        setSyncActionStatus({ loading: false, msg: 'คัดลอกลิงก์ซิงค์เรียบร้อย! นำไปวางใน LINE หรือเบราว์เซอร์มือถือได้เลย', success: true });
+                        setSyncActionStatus({ loading: false, msg: 'คัดลอก URL เว็บเรียบร้อย! นำไปส่งใน LINE หรือเบราว์เซอร์มือถือได้เลย', success: true });
                         setTimeout(() => setSyncActionStatus(null), 4000);
                       }}
                       className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
                     >
                       <Copy className="w-4 h-4" />
-                      <span>คัดลอกลิงก์ซิงค์ไปเปิดในมือถือ</span>
+                      <span>คัดลอก URL เว็บเปิดบนมือถือ</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const syncUrl = generateSyncUrl();
+                        safeCopyToClipboard(syncUrl);
+                        setSyncActionStatus({ loading: false, msg: 'คัดลอกลิงก์ซิงค์ข้อมูลเรียบร้อยแล้ว!', success: true });
+                        setTimeout(() => setSyncActionStatus(null), 4000);
+                      }}
+                      className="py-3 px-4 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Link2 className="w-4 h-4" />
+                      <span>คัดลอกลิงก์ข้อมูลตรง</span>
                     </button>
                     <button
                       onClick={handleManualSync}
@@ -829,7 +852,7 @@ export default function App() {
                       className="py-3 px-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>ดึงข้อมูลเดี๋ยวนี้</span>
+                      <span>ดึงข้อมูลทันที</span>
                     </button>
                   </div>
                 </div>
