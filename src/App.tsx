@@ -1,22 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Building, User, Shield, HelpCircle, FileText, Sparkles, Key, Check, Info, AlertTriangle, Trash2, X, RefreshCw
+  Building, User, Shield, HelpCircle, FileText, Sparkles, Key, Check, Info, AlertTriangle, Trash2, X, RefreshCw,
+  Database, Link2, Copy, Smartphone, Upload, Download, ArrowUpRight
 } from 'lucide-react';
 import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from './types';
 import { INITIAL_ROOMS, INITIAL_BOOKINGS, INITIAL_INVOICES, DEFAULT_SETTINGS, INITIAL_TICKETS } from './data';
 import CustomerView from './components/CustomerView';
 import AdminDashboard from './components/AdminDashboard';
 import { sendLineNotification } from './utils/line';
-import { fetchSupabaseData, saveSupabaseState, getSupabaseClient } from './lib/supabase';
+import { fetchSupabaseData, saveSupabaseState, getSupabaseClient, pushAllToSupabase, testSupabaseConnection } from './lib/supabase';
 import { fetchServerDb, saveServerDb, syncBookingServerDb, resetServerDb } from './lib/serverDb';
 
 export default function App() {
   const [role, setRole] = useState<'guest' | 'admin'>('guest');
 
-  // State variables for Custom Reset Dialog
+  // State variables for Custom Reset Dialog and Sync Center
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showResetSuccess, setShowResetSuccess] = useState(false);
+  const [showSyncCenterModal, setShowSyncCenterModal] = useState(false);
+  const [syncModalTab, setSyncModalTab] = useState<'link' | 'supabase' | 'code'>('link');
+  const [syncActionStatus, setSyncActionStatus] = useState<{ loading: boolean; msg?: string; success?: boolean } | null>(null);
 
   // State initialization with LocalStorage backup for absolute durability (using v5 namespace for clean reset)
   const [rooms, setRooms] = useState<Room[]>(() => {
@@ -62,9 +66,108 @@ export default function App() {
 
   const isRemoteSyncRef = useRef(false);
   const lastUpdatedRef = useRef<number>(0);
+  const lastSupabaseUpdatedRef = useRef<number>(0);
   const isInitialFetchDoneRef = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
+
+  // Mark initial boot ready after 400ms so any changes made on mobile or Vercel are immediately saved
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      isInitialFetchDoneRef.current = true;
+    }, 400);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Helper for generating base64 sync URL
+  const generateSyncUrl = () => {
+    try {
+      const payload = { rooms, bookings, invoices, tickets, settings };
+      const jsonStr = JSON.stringify(payload);
+      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      const baseUrl = window.location.origin + window.location.pathname;
+      return `${baseUrl}?sync_data=${encoded}`;
+    } catch {
+      return window.location.href;
+    }
+  };
+
+  const safeCopyToClipboard = (text: string) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {}
+      document.body.removeChild(textArea);
+    }
+  };
+
+  // Auto-import sync payload if opening via sync link (?sync_data=...)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      let syncDataRaw = urlParams.get('sync_data');
+      if (!syncDataRaw && window.location.hash) {
+        const hashQuery = window.location.hash.split('?')[1] || window.location.hash.replace('#', '');
+        syncDataRaw = new URLSearchParams(hashQuery).get('sync_data');
+      }
+      if (syncDataRaw) {
+        const decodedStr = decodeURIComponent(escape(atob(syncDataRaw)));
+        const parsed = JSON.parse(decodedStr);
+        if (parsed && (parsed.rooms || parsed.bookings || parsed.invoices)) {
+          if (parsed.rooms && Array.isArray(parsed.rooms)) {
+            setRooms(parsed.rooms);
+            localStorage.setItem('dormy_v5_rooms', JSON.stringify(parsed.rooms));
+          }
+          if (parsed.bookings && Array.isArray(parsed.bookings)) {
+            setBookings(parsed.bookings);
+            localStorage.setItem('dormy_v5_bookings', JSON.stringify(parsed.bookings));
+          }
+          if (parsed.invoices && Array.isArray(parsed.invoices)) {
+            setInvoices(parsed.invoices);
+            localStorage.setItem('dormy_v5_invoices', JSON.stringify(parsed.invoices));
+          }
+          if (parsed.tickets && Array.isArray(parsed.tickets)) {
+            setTickets(parsed.tickets);
+            localStorage.setItem('dormy_v5_tickets', JSON.stringify(parsed.tickets));
+          }
+          if (parsed.settings) {
+            setSettings(prev => {
+              const merged = { ...prev, ...parsed.settings };
+              localStorage.setItem('dormy_v5_settings', JSON.stringify(merged));
+              return merged;
+            });
+          }
+
+          // Save to server DB as well
+          saveServerDb({
+            rooms: parsed.rooms || rooms,
+            bookings: parsed.bookings || bookings,
+            invoices: parsed.invoices || invoices,
+            tickets: parsed.tickets || tickets,
+            settings: parsed.settings || settings,
+          });
+
+          // Clean URL parameter without reloading
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+
+          setShowSyncSuccess(true);
+          setTimeout(() => setShowSyncSuccess(false), 5000);
+        }
+      }
+    } catch (e) {
+      console.warn('URL sync import notice:', e);
+    }
+  }, []);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -129,7 +232,7 @@ export default function App() {
     }
   };
 
-  // Sync with built-in Server DB and Supabase on mount and poll every 1.2s for live real-time updates across devices
+  // Sync with built-in Server DB and Supabase on mount and poll every 1.5s for live real-time updates across devices
   useEffect(() => {
     let isMounted = true;
 
@@ -159,9 +262,6 @@ export default function App() {
     async function syncWithServerDb() {
       const db = await fetchServerDb();
       if (db && isMounted) {
-        if (!isInitialFetchDoneRef.current) {
-          isInitialFetchDoneRef.current = true;
-        }
         if (!lastUpdatedRef.current || (db.lastUpdated && db.lastUpdated > lastUpdatedRef.current)) {
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
@@ -182,34 +282,39 @@ export default function App() {
       }
     }
 
-    // Initial fetch from server DB
-    syncWithServerDb();
-
-    // Poll server DB every 1.0 second so any new booking/update from another device or machine instantly appears
-    const pollInterval = setInterval(() => {
-      syncWithServerDb();
-    }, 1000);
-
-    // Initial Sync from Supabase if credentials are configured
     async function loadFromSupabase() {
       const data = await fetchSupabaseData(settings);
       if (data && isMounted) {
-        isRemoteSyncRef.current = true;
-        if (data.rooms) setRooms(data.rooms);
-        if (data.bookings) setBookings(data.bookings);
-        if (data.invoices) setInvoices(data.invoices);
-        if (data.tickets) setTickets(data.tickets);
-        if (data.settings) setSettings(prev => ({
-          ...DEFAULT_SETTINGS,
-          ...prev,
-          ...data.settings,
-          supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || '',
-          supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
-        }));
-        setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
+        const time = data.lastUpdatedTime || Date.now();
+        if (!lastSupabaseUpdatedRef.current || time > lastSupabaseUpdatedRef.current) {
+          lastSupabaseUpdatedRef.current = time;
+          lastUpdatedRef.current = Math.max(lastUpdatedRef.current, time);
+          isRemoteSyncRef.current = true;
+          if (data.rooms) setRooms(data.rooms);
+          if (data.bookings) setBookings(data.bookings);
+          if (data.invoices) setInvoices(data.invoices);
+          if (data.tickets) setTickets(data.tickets);
+          if (data.settings) setSettings(prev => ({
+            ...DEFAULT_SETTINGS,
+            ...prev,
+            ...data.settings,
+            supabaseUrl: data.settings.supabaseUrl || prev.supabaseUrl || '',
+            supabaseAnonKey: data.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
+          }));
+          setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
+        }
       }
     }
+
+    // Initial fetch from server DB & Supabase
+    syncWithServerDb();
     loadFromSupabase();
+
+    // Poll BOTH server DB and Supabase every 1.5 seconds so any update from mobile or another device appears live
+    const pollInterval = setInterval(() => {
+      syncWithServerDb();
+      loadFromSupabase();
+    }, 1500);
 
     // Setup Supabase Realtime subscription if available
     const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
@@ -266,6 +371,10 @@ export default function App() {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       saveTimeoutRef.current = setTimeout(async () => {
+        const now = Date.now();
+        lastUpdatedRef.current = now;
+        lastSupabaseUpdatedRef.current = now;
+
         const res = await saveServerDb({ rooms, bookings, invoices, tickets, settings });
         if (res.lastUpdated) {
           lastUpdatedRef.current = res.lastUpdated;
@@ -280,6 +389,7 @@ export default function App() {
             } catch (e) {}
           }
         }
+        
         saveSupabaseState('rooms', rooms, settings);
         saveSupabaseState('bookings', bookings, settings);
         saveSupabaseState('invoices', invoices, settings);
@@ -426,16 +536,18 @@ export default function App() {
               </button>
             </div>
 
-            <button
-              id="btn-sync-now"
-              onClick={handleManualSync}
-              disabled={isSyncing}
-              className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all duration-300 font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-emerald-500/10"
-              title="ซิงค์ข้อมูลล่าสุดกับเซิร์ฟเวอร์เพื่อให้ข้อมูลตรงกันทุกอุปกรณ์"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'กำลังซิงค์...' : 'ซิงค์ข้อมูลข้ามเครื่อง'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-sync-now"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all duration-300 font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-emerald-500/10"
+                title="ระบบกำลังซิงค์ข้อมูล Real-time อัตโนมัติทุกๆ 1.5 วินาที หรือกดปุ่มนี้เพื่อซิงค์ข้อมูลทันที"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                <span>{isSyncing ? 'กำลังดึงข้อมูล...' : '🟢 Real-Time Synced'}</span>
+              </button>
+            </div>
 
             <button
               id="btn-reset-db"

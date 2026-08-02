@@ -6,8 +6,9 @@ let currentUrl = '';
 let currentKey = '';
 
 export function getSupabaseClient(customUrl?: string, customKey?: string): SupabaseClient | null {
-  const url = (customUrl !== undefined ? customUrl : (import.meta.env.VITE_SUPABASE_URL as string)) || '';
-  const key = (customKey !== undefined ? customKey : (import.meta.env.VITE_SUPABASE_ANON_KEY as string)) || '';
+  const metaEnv = (import.meta as any).env || {};
+  const url = (customUrl !== undefined ? customUrl : (metaEnv.VITE_SUPABASE_URL as string)) || '';
+  const key = (customKey !== undefined ? customKey : (metaEnv.VITE_SUPABASE_ANON_KEY as string)) || '';
 
   if (!url || !key || url.trim() === '' || key.trim() === '') {
     return null;
@@ -59,6 +60,7 @@ export async function fetchSupabaseData(
   invoices?: UtilityInvoice[];
   tickets?: MaintenanceTicket[];
   settings?: SystemSettings;
+  lastUpdatedTime?: number;
 } | null> {
   const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
   if (!client) return null;
@@ -66,14 +68,20 @@ export async function fetchSupabaseData(
   try {
     const { data, error } = await client.from('dormy_state').select('*');
     if (error || !data) {
-      console.warn('Supabase fetch notice:', error?.message || 'No data');
       return null;
     }
 
+    let maxTime = 0;
     const result: Record<string, any> = {};
     data.forEach((row) => {
       result[row.id] = row.data;
+      if (row.updated_at) {
+        const t = new Date(row.updated_at).getTime();
+        if (t > maxTime) maxTime = t;
+      }
     });
+
+    if (Object.keys(result).length === 0) return null;
 
     return {
       rooms: result['rooms'],
@@ -81,9 +89,9 @@ export async function fetchSupabaseData(
       invoices: result['invoices'],
       tickets: result['tickets'],
       settings: result['settings'],
+      lastUpdatedTime: maxTime || Date.now(),
     };
   } catch (err: any) {
-    console.warn('Supabase unreachable or fetch error:', err?.message || err);
     return null;
   }
 }
