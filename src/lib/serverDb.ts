@@ -10,7 +10,9 @@ export interface ServerDbState {
   lastUpdated?: number;
 }
 
-const MASTER_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019fc232-1187-7ce7-b21a-8d3d99fae8f6';
+// Dedicated high-performance Cloud API Object ID for Dormy cross-device sync
+const RESTFUL_API_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fc23c79d661e9';
+const JSON_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019fc232-1187-7ce7-b21a-8d3d99fae8f6';
 
 let serverApiDisabled = false;
 let inMemoryCloudCache: ServerDbState | null = null;
@@ -57,17 +59,32 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
   if (now < cloudCooldownUntil) {
     return inMemoryCloudCache;
   }
-  // Throttle fetches to at most once every 3 seconds
-  if (now - lastCloudFetchTime < 3000 && inMemoryCloudCache) {
+  // Throttle cloud GETs to at most once every 3.5 seconds
+  if (now - lastCloudFetchTime < 3500 && inMemoryCloudCache) {
     return inMemoryCloudCache;
   }
 
   lastCloudFetchTime = now;
+
+  // Primary Cloud Store: api.restful-api.dev
   try {
-    const res = await fetch(`${MASTER_BLOB_URL}?_t=${now}`, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
-    });
+    const res = await fetch(RESTFUL_API_URL, { cache: 'no-store' });
+    if (res.ok) {
+      const result = await res.json();
+      if (result && result.data && Array.isArray(result.data.rooms)) {
+        inMemoryCloudCache = result.data;
+        return result.data;
+      }
+    } else if (res.status === 429) {
+      cloudCooldownUntil = now + 30000;
+    }
+  } catch (err) {
+    // Silent fail over
+  }
+
+  // Backup Cloud Store: jsonblob.com (with rate limit protection)
+  try {
+    const res = await fetch(`${JSON_BLOB_URL}?_t=${now}`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.rooms)) {
@@ -75,18 +92,39 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
         return data;
       }
     } else if (res.status === 429) {
-      // Backoff for 15 seconds on 429 Too Many Requests
-      cloudCooldownUntil = now + 15000;
+      cloudCooldownUntil = now + 45000;
     }
   } catch (err) {
-    console.warn('Cloud Blob DB sync warning:', err);
+    // Silent fail
   }
+
   return inMemoryCloudCache;
 }
 
 async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
+  let isSaved = false;
+
+  // Primary Cloud Store
   try {
-    const res = await fetch(MASTER_BLOB_URL, {
+    const res = await fetch(RESTFUL_API_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ name: 'dormy_state', data: fullState })
+    });
+    if (res.ok) {
+      inMemoryCloudCache = fullState;
+      isSaved = true;
+    }
+  } catch (err) {
+    // Silent
+  }
+
+  // Backup Cloud Store
+  try {
+    const res = await fetch(JSON_BLOB_URL, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -96,12 +134,13 @@ async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
     });
     if (res.ok) {
       inMemoryCloudCache = fullState;
-      return true;
+      isSaved = true;
     }
   } catch (err) {
-    console.warn('Cloud Blob save warning:', err);
+    // Silent
   }
-  return false;
+
+  return isSaved;
 }
 
 export async function fetchServerDb(): Promise<ServerDbState | null> {
@@ -116,7 +155,7 @@ export async function fetchServerDb(): Promise<ServerDbState | null> {
     } catch {}
   }
 
-  // Always fetch Cloud Blob DB as fallback / cross-device primary
+  // Fetch Cloud DB for cross-device sync
   const cloudData = await requestCloudBlobDb();
 
   if (expressData && cloudData) {
