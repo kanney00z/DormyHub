@@ -296,7 +296,7 @@ export default function App() {
       const db = await fetchServerDb();
       if (db && isMounted && db.rooms && Array.isArray(db.rooms)) {
         const serverTime = db.lastUpdated || 0;
-        if (!hasLoadedInitialServerDbRef.current || serverTime > lastUpdatedRef.current) {
+        if (!hasLoadedInitialServerDbRef.current || (serverTime > 0 && serverTime !== lastUpdatedRef.current)) {
           hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = serverTime;
           isRemoteSyncRef.current = true;
@@ -404,13 +404,12 @@ export default function App() {
 
     if (isInitialFetchDoneRef.current && hasLoadedInitialServerDbRef.current && !isRemoteSyncRef.current) {
       isPendingSaveRef.current = true;
-      const now = Date.now();
-      lastUpdatedRef.current = now;
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       saveTimeoutRef.current = setTimeout(async () => {
         try {
+          const now = Date.now();
           lastSupabaseUpdatedRef.current = now;
 
           const res = await saveServerDb({ rooms, bookings, invoices, tickets, settings });
@@ -576,41 +575,6 @@ export default function App() {
                 ผู้ดูแลระบบ (Admin)
               </button>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                id="btn-sync-center"
-                onClick={async () => {
-                  setShowSyncCenterModal(true);
-                  saveServerDb({ rooms, bookings, invoices, tickets, settings });
-                }}
-                className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 px-3.5 py-2 rounded-xl transition-all duration-300 font-bold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-indigo-500/10"
-                title="เปิดศูนย์บริการซิงค์ข้อมูล PC <-> มือถือ เพื่อแสดง QR Code หรือสแกนดึงข้อมูล"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-                <span>📱 ซิงค์ PC ↔ มือถือ</span>
-              </button>
-
-              <button
-                id="btn-sync-now"
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 px-3.5 py-2 rounded-xl transition-all duration-300 font-semibold whitespace-nowrap cursor-pointer flex items-center gap-1.5 shadow-sm hover:shadow-emerald-500/10"
-                title="ระบบซิงค์ข้อมูล Real-time อัตโนมัติแบบ 100% ทุก 1 วินาทีระหว่าง PC และมือถือโดยไม่ต้องกดอะไร"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
-                <span>{isSyncing ? 'กำลังดึง...' : '🟢 Real-Time Active'}</span>
-              </button>
-            </div>
-
-            <button
-              id="btn-reset-db"
-              onClick={handleResetDatabase}
-              className="text-xs bg-white/5 text-slate-400 border border-white/5 px-3.5 py-2 rounded-xl hover:bg-white/10 hover:text-white transition-all duration-300 font-light whitespace-nowrap cursor-pointer hover:border-white/10"
-              title="รีเซ็ตค่าเริ่มต้นทั้งหมด"
-            >
-              รีเซ็ตระบบ
-            </button>
           </div>
         </header>
       </div>
