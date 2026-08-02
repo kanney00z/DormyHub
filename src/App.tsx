@@ -11,6 +11,7 @@ import AdminDashboard from './components/AdminDashboard';
 import { sendLineNotification } from './utils/line';
 import { fetchSupabaseData, saveSupabaseState, getSupabaseClient, pushAllToSupabase, testSupabaseConnection } from './lib/supabase';
 import { fetchServerDb, saveServerDb, syncBookingServerDb, resetServerDb } from './lib/serverDb';
+import { dedupeById } from './utils/dedupe';
 
 export default function App() {
   const [role, setRole] = useState<'guest' | 'admin'>('guest');
@@ -26,22 +27,22 @@ export default function App() {
   // State initialization with LocalStorage backup for absolute durability (using v5 namespace for clean reset)
   const [rooms, setRooms] = useState<Room[]>(() => {
     const saved = localStorage.getItem('dormy_v5_rooms');
-    return saved ? JSON.parse(saved) : INITIAL_ROOMS;
+    return dedupeById(saved ? JSON.parse(saved) : INITIAL_ROOMS);
   });
 
   const [bookings, setBookings] = useState<Booking[]>(() => {
     const saved = localStorage.getItem('dormy_v5_bookings');
-    return saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
+    return dedupeById(saved ? JSON.parse(saved) : INITIAL_BOOKINGS);
   });
 
   const [invoices, setInvoices] = useState<UtilityInvoice[]>(() => {
     const saved = localStorage.getItem('dormy_v5_invoices');
-    return saved ? JSON.parse(saved) : INITIAL_INVOICES;
+    return dedupeById(saved ? JSON.parse(saved) : INITIAL_INVOICES);
   });
 
   const [tickets, setTickets] = useState<MaintenanceTicket[]>(() => {
     const saved = localStorage.getItem('dormy_v5_tickets');
-    return saved ? JSON.parse(saved) : INITIAL_TICKETS;
+    return dedupeById(saved ? JSON.parse(saved) : INITIAL_TICKETS);
   });
 
   const [settings, setSettings] = useState<SystemSettings>(() => {
@@ -84,10 +85,10 @@ export default function App() {
           hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
-          setRooms(db.rooms);
-          if (db.bookings) setBookings(db.bookings);
-          if (db.invoices) setInvoices(db.invoices);
-          if (db.tickets) setTickets(db.tickets);
+          setRooms(dedupeById(db.rooms));
+          if (db.bookings) setBookings(dedupeById(db.bookings));
+          if (db.invoices) setInvoices(dedupeById(db.invoices));
+          if (db.tickets) setTickets(dedupeById(db.tickets));
           if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
           setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 800);
         } else {
@@ -211,20 +212,24 @@ export default function App() {
         lastUpdatedRef.current = db.lastUpdated || Date.now();
 
         if (db.rooms && Array.isArray(db.rooms)) {
-          setRooms(db.rooms);
-          localStorage.setItem('dormy_v5_rooms', JSON.stringify(db.rooms));
+          const cleanRooms = dedupeById(db.rooms);
+          setRooms(cleanRooms);
+          localStorage.setItem('dormy_v5_rooms', JSON.stringify(cleanRooms));
         }
         if (db.bookings && Array.isArray(db.bookings)) {
-          setBookings(db.bookings);
-          localStorage.setItem('dormy_v5_bookings', JSON.stringify(db.bookings));
+          const cleanBookings = dedupeById(db.bookings);
+          setBookings(cleanBookings);
+          localStorage.setItem('dormy_v5_bookings', JSON.stringify(cleanBookings));
         }
         if (db.invoices && Array.isArray(db.invoices)) {
-          setInvoices(db.invoices);
-          localStorage.setItem('dormy_v5_invoices', JSON.stringify(db.invoices));
+          const cleanInvoices = dedupeById(db.invoices);
+          setInvoices(cleanInvoices);
+          localStorage.setItem('dormy_v5_invoices', JSON.stringify(cleanInvoices));
         }
         if (db.tickets && Array.isArray(db.tickets)) {
-          setTickets(db.tickets);
-          localStorage.setItem('dormy_v5_tickets', JSON.stringify(db.tickets));
+          const cleanTickets = dedupeById(db.tickets);
+          setTickets(cleanTickets);
+          localStorage.setItem('dormy_v5_tickets', JSON.stringify(cleanTickets));
         }
         if (db.settings) {
           const newSet = {
@@ -243,10 +248,10 @@ export default function App() {
       const supData = await fetchSupabaseData(settings);
       if (supData) {
         isRemoteSyncRef.current = true;
-        if (supData.rooms && supData.rooms.length > 0) setRooms(supData.rooms);
-        if (supData.bookings) setBookings(supData.bookings);
-        if (supData.invoices) setInvoices(supData.invoices);
-        if (supData.tickets) setTickets(supData.tickets);
+        if (supData.rooms && supData.rooms.length > 0) setRooms(dedupeById(supData.rooms));
+        if (supData.bookings) setBookings(dedupeById(supData.bookings));
+        if (supData.invoices) setInvoices(dedupeById(supData.invoices));
+        if (supData.tickets) setTickets(dedupeById(supData.tickets));
         if (supData.settings) setSettings(prev => ({
           ...DEFAULT_SETTINGS,
           ...prev,
@@ -279,10 +284,10 @@ export default function App() {
             if (db && db.lastUpdated && db.lastUpdated > lastUpdatedRef.current) {
               lastUpdatedRef.current = db.lastUpdated;
               isRemoteSyncRef.current = true;
-              if (db.rooms) setRooms(db.rooms);
-              if (db.bookings) setBookings(db.bookings);
-              if (db.invoices) setInvoices(db.invoices);
-              if (db.tickets) setTickets(db.tickets);
+              if (db.rooms) setRooms(dedupeById(db.rooms));
+              if (db.bookings) setBookings(dedupeById(db.bookings));
+              if (db.invoices) setInvoices(dedupeById(db.invoices));
+              if (db.tickets) setTickets(dedupeById(db.tickets));
               if (db.settings) setSettings(prev => ({ ...DEFAULT_SETTINGS, ...prev, ...db.settings }));
               setTimeout(() => { isRemoteSyncRef.current = false; }, 600);
             }
@@ -300,10 +305,10 @@ export default function App() {
           hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = serverTime;
           isRemoteSyncRef.current = true;
-          if (db.rooms) setRooms(db.rooms);
-          if (db.bookings) setBookings(db.bookings);
-          if (db.invoices) setInvoices(db.invoices);
-          if (db.tickets) setTickets(db.tickets);
+          if (db.rooms) setRooms(dedupeById(db.rooms));
+          if (db.bookings) setBookings(dedupeById(db.bookings));
+          if (db.invoices) setInvoices(dedupeById(db.invoices));
+          if (db.tickets) setTickets(dedupeById(db.tickets));
           if (db.settings) setSettings(prev => ({
             ...DEFAULT_SETTINGS,
             ...prev,
@@ -325,10 +330,10 @@ export default function App() {
           lastSupabaseUpdatedRef.current = time;
           lastUpdatedRef.current = Math.max(lastUpdatedRef.current, time);
           isRemoteSyncRef.current = true;
-          if (data.rooms) setRooms(data.rooms);
-          if (data.bookings) setBookings(data.bookings);
-          if (data.invoices) setInvoices(data.invoices);
-          if (data.tickets) setTickets(data.tickets);
+          if (data.rooms) setRooms(dedupeById(data.rooms));
+          if (data.bookings) setBookings(dedupeById(data.bookings));
+          if (data.invoices) setInvoices(dedupeById(data.invoices));
+          if (data.tickets) setTickets(dedupeById(data.tickets));
           if (data.settings) setSettings(prev => ({
             ...DEFAULT_SETTINGS,
             ...prev,

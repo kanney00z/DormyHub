@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Room, Booking, SystemSettings, UtilityInvoice, MaintenanceTicket } from '../types';
 import { sendLineNotification } from '../utils/line';
+import { dedupeById } from '../utils/dedupe';
 
 interface CustomerViewProps {
   rooms: Room[];
@@ -80,7 +81,7 @@ export default function CustomerView({
 
   // Filtered rooms
   const filteredRooms = useMemo(() => {
-    return rooms.filter(room => {
+    const list = rooms.filter(room => {
       // Show only available or occupied rooms (exclude maintenance from booking)
       if (room.status === 'Maintenance') return false;
       
@@ -91,6 +92,7 @@ export default function CustomerView({
       
       return matchesType && matchesSearch;
     });
+    return dedupeById(list);
   }, [rooms, selectedType, searchQuery]);
 
   // Amenity icon helper

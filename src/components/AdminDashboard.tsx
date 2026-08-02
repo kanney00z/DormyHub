@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Room, Booking, UtilityInvoice, SystemSettings, MaintenanceTicket } from '../types';
 import { testLineNotification, sendLineNotification } from '../utils/line';
+import { dedupeById } from '../utils/dedupe';
 
 const ROOM_IMAGE_PRESETS = [
   { name: 'Standard Cozy', url: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80' },
@@ -211,7 +212,7 @@ export default function AdminDashboard({
 
   // UPGRADE 2 & 3: Memoized filter logic for rooms, bookings, and invoices
   const filteredRooms = useMemo(() => {
-    return rooms.filter(room => {
+    const list = rooms.filter(room => {
       const matchFloor = floorFilter === 'All' || room.floor === floorFilter;
       const matchStatus = roomStatusFilter === 'All' || room.status === roomStatusFilter;
       const matchSearch = roomSearchText === '' ||
@@ -221,10 +222,11 @@ export default function AdminDashboard({
         room.amenities.some(a => a.toLowerCase().includes(roomSearchText.toLowerCase()));
       return matchFloor && matchStatus && matchSearch;
     });
+    return dedupeById(list);
   }, [rooms, floorFilter, roomStatusFilter, roomSearchText]);
 
   const filteredTickets = useMemo(() => {
-    return tickets.filter(t => {
+    const list = tickets.filter(t => {
       const matchSearch = ticketSearchText === '' ||
         t.roomNumber.includes(ticketSearchText) ||
         t.guestName.toLowerCase().includes(ticketSearchText.toLowerCase()) ||
@@ -237,10 +239,11 @@ export default function AdminDashboard({
 
       return matchSearch && matchUrgency && matchStatus && matchCategory;
     });
+    return dedupeById(list);
   }, [tickets, ticketSearchText, ticketUrgencyFilter, ticketStatusFilter, ticketCategoryFilter]);
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter(b => {
+    const list = bookings.filter(b => {
       const matchSearch = 
         b.guestName.toLowerCase().includes(bookingSearchText.toLowerCase()) ||
         b.roomNumber.includes(bookingSearchText) ||
@@ -251,10 +254,11 @@ export default function AdminDashboard({
       const matchStatus = bookingStatusFilter === 'All' || b.status === bookingStatusFilter;
       return matchSearch && matchStatus;
     });
+    return dedupeById(list);
   }, [bookings, bookingSearchText, bookingStatusFilter]);
 
   const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
+    const list = invoices.filter(inv => {
       const matchSearch = 
         inv.roomNumber.includes(invoiceSearchText) ||
         inv.id.toLowerCase().includes(invoiceSearchText.toLowerCase()) ||
@@ -263,6 +267,7 @@ export default function AdminDashboard({
       const matchStatus = invoiceStatusFilter === 'All' || inv.status === invoiceStatusFilter;
       return matchSearch && matchStatus;
     });
+    return dedupeById(list);
   }, [invoices, invoiceSearchText, invoiceStatusFilter]);
 
   const THAI_MONTHS_FULL = [
@@ -408,9 +413,15 @@ export default function AdminDashboard({
                          newRoomType === 'Family' ? 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=80' :
                          'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80';
 
+    const roomNum = newRoomNumber.trim();
+    let targetId = 'room-' + roomNum;
+    if (rooms.some(r => r.id === targetId)) {
+      targetId = 'room-' + roomNum + '-' + Date.now().toString().slice(-4);
+    }
+
     const newRoom: Room = {
-      id: 'room-' + newRoomNumber,
-      number: newRoomNumber,
+      id: targetId,
+      number: roomNum,
       type: newRoomType,
       status: 'Available',
       dailyPrice: Number(newRoomDaily),
