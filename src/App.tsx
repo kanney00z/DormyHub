@@ -351,6 +351,16 @@ export default function App() {
       loadFromSupabase();
     }, 1000);
 
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithServerDb();
+        loadFromSupabase();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+
     // Setup Supabase Realtime subscription if available
     const client = getSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
     let channel: any = null;
@@ -385,6 +395,8 @@ export default function App() {
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
       if (bc) bc.close();
       if (client && channel) {
         client.removeChannel(channel);
