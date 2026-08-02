@@ -20,6 +20,7 @@ export default function App() {
   const [showResetSuccess, setShowResetSuccess] = useState(false);
   const [showSyncCenterModal, setShowSyncCenterModal] = useState(false);
   const [syncModalTab, setSyncModalTab] = useState<'link' | 'supabase' | 'code'>('link');
+  const [qrType, setQrType] = useState<'url' | 'data'>('url');
   const [syncActionStatus, setSyncActionStatus] = useState<{ loading: boolean; msg?: string; success?: boolean } | null>(null);
 
   // State initialization with LocalStorage backup for absolute durability (using v5 namespace for clean reset)
@@ -68,16 +69,18 @@ export default function App() {
   const lastUpdatedRef = useRef<number>(0);
   const lastSupabaseUpdatedRef = useRef<number>(0);
   const isInitialFetchDoneRef = useRef(false);
+  const hasLoadedInitialServerDbRef = useRef(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSyncSuccess, setShowSyncSuccess] = useState(false);
 
-  // Initial boot sync sequence: Wait for initial server DB and Supabase responses before enabling auto-save
+  // Initial boot sync sequence: Wait for initial server DB response before enabling auto-save
   useEffect(() => {
     let isMounted = true;
     (async () => {
       try {
         const db = await fetchServerDb();
         if (db && isMounted && db.rooms && Array.isArray(db.rooms) && db.rooms.length > 0) {
+          hasLoadedInitialServerDbRef.current = true;
           lastUpdatedRef.current = db.lastUpdated || Date.now();
           isRemoteSyncRef.current = true;
           setRooms(db.rooms);
@@ -146,6 +149,7 @@ export default function App() {
         const decodedStr = decodeURIComponent(escape(atob(syncDataRaw)));
         const parsed = JSON.parse(decodedStr);
         if (parsed && (parsed.rooms || parsed.bookings || parsed.invoices)) {
+          hasLoadedInitialServerDbRef.current = true;
           if (parsed.rooms && Array.isArray(parsed.rooms)) {
             setRooms(parsed.rooms);
             localStorage.setItem('dormy_v5_rooms', JSON.stringify(parsed.rooms));
@@ -194,6 +198,7 @@ export default function App() {
 
   const handleManualSync = async () => {
     setIsSyncing(true);
+    hasLoadedInitialServerDbRef.current = true;
     try {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       const db = await fetchServerDb();
@@ -284,9 +289,11 @@ export default function App() {
 
     async function syncWithServerDb() {
       const db = await fetchServerDb();
-      if (db && isMounted) {
-        if (!lastUpdatedRef.current || (db.lastUpdated && db.lastUpdated > lastUpdatedRef.current)) {
-          lastUpdatedRef.current = db.lastUpdated || Date.now();
+      if (db && isMounted && db.rooms && Array.isArray(db.rooms) && db.rooms.length > 0) {
+        const serverTime = db.lastUpdated || 0;
+        if (!hasLoadedInitialServerDbRef.current || serverTime > lastUpdatedRef.current) {
+          hasLoadedInitialServerDbRef.current = true;
+          lastUpdatedRef.current = serverTime;
           isRemoteSyncRef.current = true;
           if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
           if (db.rooms) setRooms(db.rooms);
@@ -300,7 +307,7 @@ export default function App() {
             supabaseUrl: db.settings.supabaseUrl || prev.supabaseUrl || '',
             supabaseAnonKey: db.settings.supabaseAnonKey || prev.supabaseAnonKey || '',
           }));
-          setTimeout(() => { isRemoteSyncRef.current = false; }, 1000);
+          setTimeout(() => { if (isMounted) isRemoteSyncRef.current = false; }, 1000);
         }
       }
     }
@@ -390,7 +397,7 @@ export default function App() {
     localStorage.setItem('dormy_v5_tickets', JSON.stringify(tickets));
     localStorage.setItem('dormy_v5_settings', JSON.stringify(settings));
 
-    if (isInitialFetchDoneRef.current && !isRemoteSyncRef.current) {
+    if (isInitialFetchDoneRef.current && hasLoadedInitialServerDbRef.current && !isRemoteSyncRef.current) {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
       saveTimeoutRef.current = setTimeout(async () => {
@@ -804,20 +811,41 @@ export default function App() {
               {/* Tab 1: QR Code & Direct Sync Link */}
               {syncModalTab === 'link' && (
                 <div className="space-y-4 text-center">
+                  <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+                    <button
+                      onClick={() => setQrType('url')}
+                      className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all cursor-pointer ${
+                        qrType === 'url' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      📷 QR Code เปิดเว็บ (Auto-Sync)
+                    </button>
+                    <button
+                      onClick={() => setQrType('data')}
+                      className={`flex-1 py-1.5 px-2 rounded-lg font-bold transition-all cursor-pointer ${
+                        qrType === 'data' ? 'bg-sky-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ⚡ QR Code ฝังข้อมูลตรง (Instant QR)
+                    </button>
+                  </div>
+
                   <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center gap-3">
                     <p className="text-xs text-slate-300 font-medium">
-                      📷 สแกน QR Code นี้ด้วยกล้องมือถือ เพื่อเปิดเว็บหอพักบนมือถือ (ระบบซิงค์ Real-Time อัตโนมัติทันที)
+                      {qrType === 'url' 
+                        ? '📷 สแกนเพื่อเปิดเว็บหอพักบนมือถือ (ระบบจะซิงค์ Real-Time ดึงข้อมูลอัตโนมัติจาก Server PC)' 
+                        : '⚡ สแกน QR Code นี้เพื่อดึงข้อมูลทั้งหมดเข้ามือถือทันที (รวมห้อง พัก การจอง และใบแจ้งหนี้)'}
                     </p>
                     <div className="p-3 bg-white rounded-2xl border-4 border-indigo-500/30 shadow-lg">
                       <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(getAppBaseUrl())}`} 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrType === 'url' ? getAppBaseUrl() : generateSyncUrl())}`} 
                         alt="Scan to Sync Mobile"
                         className="w-52 h-52 rounded-lg object-contain"
                       />
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span>{getAppBaseUrl()}</span>
+                    <div className="flex items-center gap-2 text-[11px] text-emerald-400 font-mono bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                      <span className="truncate">{qrType === 'url' ? getAppBaseUrl() : 'dormy://sync-payload-embedded'}</span>
                     </div>
                   </div>
 
