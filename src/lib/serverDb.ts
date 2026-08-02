@@ -9,11 +9,34 @@ export interface ServerDbState {
   lastUpdated?: number;
 }
 
-const FALLBACK_SERVER_URL = 'https://ais-pre-jjad4i42hp3gdfhxfo6uvr-361727948318.asia-southeast1.run.app';
+const SERVER_BASE_URLS = [
+  '', // Relative (current origin)
+  'https://ais-dev-jjad4i42hp3gdfhxfo6uvr-361727948318.asia-southeast1.run.app',
+  'https://ais-pre-jjad4i42hp3gdfhxfo6uvr-361727948318.asia-southeast1.run.app'
+];
 
-async function requestApi(path: string, options?: RequestInit): Promise<Response | null> {
+function getUniqueBaseUrls(): string[] {
+  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const set = new Set<string>();
+  
+  // Current relative base
+  set.add('');
+
+  if (currentOrigin) {
+    set.add(currentOrigin);
+  }
+
+  SERVER_BASE_URLS.forEach(url => {
+    if (url) set.add(url);
+  });
+
+  return Array.from(set);
+}
+
+async function requestEndpoint(baseUrl: string, path: string, options?: RequestInit): Promise<{ ok: boolean; data?: any; baseUrl: string }> {
   const isGet = !options || !options.method || options.method.toUpperCase() === 'GET';
   const queryPath = isGet ? `${path}${path.includes('?') ? '&' : '?'}_t=${Date.now()}` : path;
+  const fullUrl = baseUrl ? `${baseUrl}${queryPath}` : queryPath;
 
   const fetchOptions: RequestInit = {
     ...options,
@@ -25,42 +48,44 @@ async function requestApi(path: string, options?: RequestInit): Promise<Response
     },
   };
 
-  // 1. Try relative request first
   try {
-    const res = await fetch(queryPath, fetchOptions);
+    const res = await fetch(fullUrl, fetchOptions);
     if (res.ok) {
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
-        return res;
+        const data = await res.json();
+        return { ok: true, data, baseUrl };
       }
     }
-  } catch {
-    // ignore and proceed to fallback
+  } catch (e) {
+    // ignore request failure
   }
-
-  // 2. Fallback to Cloud Run Express server URL if relative call failed or returned HTML 404 (e.g. on Vercel)
-  try {
-    const absoluteUrl = `${FALLBACK_SERVER_URL}${queryPath}`;
-    const res = await fetch(absoluteUrl, fetchOptions);
-    if (res.ok) {
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        return res;
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  return null;
+  return { ok: false, baseUrl };
 }
 
 export async function fetchServerDb(): Promise<ServerDbState | null> {
   try {
-    const res = await requestApi('/api/db');
-    if (!res) return null;
-    const data = await res.json();
-    return data;
+    const baseUrls = getUniqueBaseUrls();
+    const promises = baseUrls.map(baseUrl => requestEndpoint(baseUrl, '/api/db'));
+    const results = await Promise.allSettled(promises);
+
+    let newestState: ServerDbState | null = null;
+    let newestTime = -1;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.ok && result.value.data) {
+        const data = result.value.data as ServerDbState;
+        if (data.rooms && Array.isArray(data.rooms)) {
+          const time = data.lastUpdated || 0;
+          if (time >= newestTime) {
+            newestTime = time;
+            newestState = data;
+          }
+        }
+      }
+    }
+
+    return newestState;
   } catch {
     return null;
   }
@@ -68,14 +93,29 @@ export async function fetchServerDb(): Promise<ServerDbState | null> {
 
 export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
-    const res = await requestApi('/api/db', {
+    const baseUrls = getUniqueBaseUrls();
+    const fetchOptions: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    });
-    if (!res) return { success: false };
-    const data = await res.json();
-    return { success: true, lastUpdated: data.lastUpdated };
+    };
+
+    const promises = baseUrls.map(baseUrl => requestEndpoint(baseUrl, '/api/db', fetchOptions));
+    const results = await Promise.allSettled(promises);
+
+    let maxLastUpdated = Date.now();
+    let hasSuccess = false;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.ok && result.value.data) {
+        hasSuccess = true;
+        if (result.value.data.lastUpdated) {
+          maxLastUpdated = Math.max(maxLastUpdated, result.value.data.lastUpdated);
+        }
+      }
+    }
+
+    return { success: hasSuccess, lastUpdated: maxLastUpdated };
   } catch {
     return { success: false };
   }
@@ -83,14 +123,29 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ s
 
 export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
-    const res = await requestApi('/api/db/booking', {
+    const baseUrls = getUniqueBaseUrls();
+    const fetchOptions: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ booking, rooms }),
-    });
-    if (!res) return { success: false };
-    const data = await res.json();
-    return { success: true, lastUpdated: data.lastUpdated };
+    };
+
+    const promises = baseUrls.map(baseUrl => requestEndpoint(baseUrl, '/api/db/booking', fetchOptions));
+    const results = await Promise.allSettled(promises);
+
+    let maxLastUpdated = Date.now();
+    let hasSuccess = false;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.ok && result.value.data) {
+        hasSuccess = true;
+        if (result.value.data.lastUpdated) {
+          maxLastUpdated = Math.max(maxLastUpdated, result.value.data.lastUpdated);
+        }
+      }
+    }
+
+    return { success: hasSuccess, lastUpdated: maxLastUpdated };
   } catch {
     return { success: false };
   }
@@ -98,14 +153,30 @@ export async function syncBookingServerDb(booking: Booking, rooms?: Room[]): Pro
 
 export async function resetServerDb(): Promise<{ success: boolean; lastUpdated?: number }> {
   try {
-    const res = await requestApi('/api/db/reset', {
+    const baseUrls = getUniqueBaseUrls();
+    const fetchOptions: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res) return { success: false };
-    const data = await res.json();
-    return { success: true, lastUpdated: data.lastUpdated };
+    };
+
+    const promises = baseUrls.map(baseUrl => requestEndpoint(baseUrl, '/api/db/reset', fetchOptions));
+    const results = await Promise.allSettled(promises);
+
+    let maxLastUpdated = Date.now();
+    let hasSuccess = false;
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.ok && result.value.data) {
+        hasSuccess = true;
+        if (result.value.data.lastUpdated) {
+          maxLastUpdated = Math.max(maxLastUpdated, result.value.data.lastUpdated);
+        }
+      }
+    }
+
+    return { success: hasSuccess, lastUpdated: maxLastUpdated };
   } catch {
     return { success: false };
   }
 }
+
