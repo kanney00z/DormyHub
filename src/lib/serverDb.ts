@@ -9,7 +9,11 @@ export interface ServerDbState {
   lastUpdated?: number;
 }
 
+let serverApiDisabled = false;
+
 async function requestApi(path: string, options?: RequestInit): Promise<Response | null> {
+  if (serverApiDisabled) return null;
+
   const isGet = !options || !options.method || options.method.toUpperCase() === 'GET';
   const queryPath = isGet ? `${path}${path.includes('?') ? '&' : '?'}_t=${Date.now()}` : path;
 
@@ -30,9 +34,13 @@ async function requestApi(path: string, options?: RequestInit): Promise<Response
       if (contentType.includes('application/json')) {
         return res;
       }
+    } else {
+      if (res.status === 404 || res.status === 405 || res.status === 502) {
+        serverApiDisabled = true;
+      }
     }
   } catch {
-    // Silent catch when backend API is not hosted on current origin (e.g., static Vercel host)
+    serverApiDisabled = true;
   }
   return null;
 }
