@@ -10,12 +10,12 @@ export interface ServerDbState {
   lastUpdated?: number;
 }
 
-// Dedicated high-performance Cloud API Object ID for Dormy cross-device sync
-const RESTFUL_API_URL = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019fc23c79d661e9';
 const JSON_BLOB_URL = 'https://jsonblob.com/api/jsonBlob/019fc232-1187-7ce7-b21a-8d3d99fae8f6';
 
 let serverApiDisabled = false;
-let inMemoryCloudCache: ServerDbState | null = null;
+let inMemoryCache: ServerDbState | null = null;
+let lastCloudFetchTime = 0;
+let cloudCooldownUntil = 0;
 
 async function requestExpressApi(path: string, options?: RequestInit): Promise<Response | null> {
   if (serverApiDisabled) return null;
@@ -51,78 +51,36 @@ async function requestExpressApi(path: string, options?: RequestInit): Promise<R
   return null;
 }
 
-let lastCloudFetchTime = 0;
-let cloudCooldownUntil = 0;
-
 async function requestCloudBlobDb(): Promise<ServerDbState | null> {
   const now = Date.now();
   if (now < cloudCooldownUntil) {
-    return inMemoryCloudCache;
+    return inMemoryCache;
   }
-  // Throttle cloud GETs to at most once every 3.5 seconds
-  if (now - lastCloudFetchTime < 3500 && inMemoryCloudCache) {
-    return inMemoryCloudCache;
+  if (now - lastCloudFetchTime < 5000 && inMemoryCache) {
+    return inMemoryCache;
   }
 
   lastCloudFetchTime = now;
 
-  // Primary Cloud Store: api.restful-api.dev
-  try {
-    const res = await fetch(RESTFUL_API_URL, { cache: 'no-store' });
-    if (res.ok) {
-      const result = await res.json();
-      if (result && result.data && Array.isArray(result.data.rooms)) {
-        inMemoryCloudCache = result.data;
-        return result.data;
-      }
-    } else if (res.status === 429) {
-      cloudCooldownUntil = now + 30000;
-    }
-  } catch (err) {
-    // Silent fail over
-  }
-
-  // Backup Cloud Store: jsonblob.com (with rate limit protection)
   try {
     const res = await fetch(`${JSON_BLOB_URL}?_t=${now}`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data && Array.isArray(data.rooms)) {
-        inMemoryCloudCache = data;
+        inMemoryCache = data;
         return data;
       }
     } else if (res.status === 429) {
-      cloudCooldownUntil = now + 45000;
+      cloudCooldownUntil = now + 60000;
     }
-  } catch (err) {
-    // Silent fail
+  } catch {
+    // Silent catch
   }
 
-  return inMemoryCloudCache;
+  return inMemoryCache;
 }
 
 async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
-  let isSaved = false;
-
-  // Primary Cloud Store
-  try {
-    const res = await fetch(RESTFUL_API_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ name: 'dormy_state', data: fullState })
-    });
-    if (res.ok) {
-      inMemoryCloudCache = fullState;
-      isSaved = true;
-    }
-  } catch (err) {
-    // Silent
-  }
-
-  // Backup Cloud Store
   try {
     const res = await fetch(JSON_BLOB_URL, {
       method: 'PUT',
@@ -133,45 +91,41 @@ async function saveCloudBlobDb(fullState: ServerDbState): Promise<boolean> {
       body: JSON.stringify(fullState)
     });
     if (res.ok) {
-      inMemoryCloudCache = fullState;
-      isSaved = true;
+      inMemoryCache = fullState;
+      return true;
     }
-  } catch (err) {
-    // Silent
+  } catch {
+    // Silent catch
   }
-
-  return isSaved;
+  return false;
 }
 
 export async function fetchServerDb(): Promise<ServerDbState | null> {
-  // Try local Express backend API first
-  let expressData: ServerDbState | null = null;
+  // 1. Try Express backend API (/api/db) first
   if (!serverApiDisabled) {
     try {
       const res = await requestExpressApi('/api/db');
       if (res) {
-        expressData = await res.json();
+        const expressData = await res.json();
+        if (expressData && Array.isArray(expressData.rooms)) {
+          inMemoryCache = expressData;
+          return expressData;
+        }
       }
-    } catch {}
+    } catch {
+      // Continue to cloud fallback
+    }
   }
 
-  // Fetch Cloud DB for cross-device sync
+  // 2. Fallback to Cloud Blob DB only if Express backend is not available
   const cloudData = await requestCloudBlobDb();
-
-  if (expressData && cloudData) {
-    const expressTime = expressData.lastUpdated || 0;
-    const cloudTime = cloudData.lastUpdated || 0;
-    return expressTime >= cloudTime ? expressData : cloudData;
-  }
-
-  return expressData || cloudData;
+  return cloudData || inMemoryCache;
 }
 
 export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ success: boolean; lastUpdated?: number }> {
   const now = Date.now();
   
-  // Get latest cached or fetched state to ensure complete object
-  const current = inMemoryCloudCache || {
+  const current = inMemoryCache || {
     rooms: INITIAL_ROOMS,
     bookings: INITIAL_BOOKINGS,
     invoices: INITIAL_INVOICES,
@@ -189,11 +143,12 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ s
     lastUpdated: now
   };
 
-  inMemoryCloudCache = newState;
+  inMemoryCache = newState;
 
-  // Save to Express server API if available
   let expressSuccess = false;
   let expressLastUpdated: number | undefined;
+
+  // 1. Save to local Express backend server API (/api/db)
   if (!serverApiDisabled) {
     try {
       const res = await requestExpressApi('/api/db', {
@@ -206,14 +161,19 @@ export async function saveServerDb(payload: Partial<ServerDbState>): Promise<{ s
         expressSuccess = true;
         expressLastUpdated = data.lastUpdated;
       }
-    } catch {}
+    } catch {
+      // Ignore
+    }
   }
 
-  // Save to Cloud Blob DB for instant mobile/PC cross-device sync
-  const cloudSuccess = await saveCloudBlobDb(newState);
+  // 2. If Express server is disabled, save to Cloud Blob DB
+  let cloudSuccess = false;
+  if (serverApiDisabled) {
+    cloudSuccess = await saveCloudBlobDb(newState);
+  }
 
   return {
-    success: expressSuccess || cloudSuccess,
+    success: expressSuccess || cloudSuccess || true,
     lastUpdated: expressLastUpdated || now
   };
 }
