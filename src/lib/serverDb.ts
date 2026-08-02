@@ -49,9 +49,22 @@ async function requestExpressApi(path: string, options?: RequestInit): Promise<R
   return null;
 }
 
+let lastCloudFetchTime = 0;
+let cloudCooldownUntil = 0;
+
 async function requestCloudBlobDb(): Promise<ServerDbState | null> {
+  const now = Date.now();
+  if (now < cloudCooldownUntil) {
+    return inMemoryCloudCache;
+  }
+  // Throttle fetches to at most once every 3 seconds
+  if (now - lastCloudFetchTime < 3000 && inMemoryCloudCache) {
+    return inMemoryCloudCache;
+  }
+
+  lastCloudFetchTime = now;
   try {
-    const res = await fetch(`${MASTER_BLOB_URL}?_t=${Date.now()}`, {
+    const res = await fetch(`${MASTER_BLOB_URL}?_t=${now}`, {
       cache: 'no-store',
       headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
     });
@@ -61,6 +74,9 @@ async function requestCloudBlobDb(): Promise<ServerDbState | null> {
         inMemoryCloudCache = data;
         return data;
       }
+    } else if (res.status === 429) {
+      // Backoff for 15 seconds on 429 Too Many Requests
+      cloudCooldownUntil = now + 15000;
     }
   } catch (err) {
     console.warn('Cloud Blob DB sync warning:', err);

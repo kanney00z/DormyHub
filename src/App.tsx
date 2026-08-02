@@ -345,11 +345,11 @@ export default function App() {
     syncWithServerDb();
     loadFromSupabase();
 
-    // Poll BOTH server DB and Supabase every 1.0 second so any update from mobile or another device appears live
+    // Poll BOTH server DB and Supabase every 4 seconds for live cross-device sync
     const pollInterval = setInterval(() => {
       syncWithServerDb();
       loadFromSupabase();
-    }, 1000);
+    }, 4000);
 
     const handleFocusOrVisibility = () => {
       if (document.visibilityState === 'visible') {
